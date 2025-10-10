@@ -7,10 +7,19 @@ export function useData() {
   const [isLoading, setIsLoading] = useState(true);
   const [availableBYs, setAvailableBYs] = useState<number[]>([]);
   const [currentBY, setCurrentBY] = useState<number>(2025);
+  const [moromiData, setMoromiData] = useState<MoromiData[]>([]);
+  const [moromiProcesses, setMoromiProcesses] = useState<MoromiProcess[]>([]);
 
   useEffect(() => {
     loadAllData();
   }, []);
+
+  // currentBY が変わったらデータ読み込み
+  useEffect(() => {
+    if (availableBYs.length > 0) {
+      loadMoromiByBY(currentBY);
+    }
+  }, [currentBY, availableBYs]);
 
   const loadAllData = async () => {
     try {
@@ -34,6 +43,19 @@ export function useData() {
     }
   };
 
+  const loadMoromiByBY = async (by: number) => {
+  try {
+    console.log('===== loadMoromiByBY 開始 =====');
+    console.log('取得するBY:', by);
+    const data = await getMoromiByBY(by);
+    console.log('取得したデータ数:', data.length);
+    setMoromiData(data);
+    console.log('setMoromiData 完了');
+    console.log('===== loadMoromiByBY 終了 =====');
+  } catch (error) {
+    console.error('もろみデータ取得エラー:', error);
+  }
+};
   const importFromLocalCSV = async () => {
     try {
       const response = await fetch('/data/Book1.csv');
@@ -52,27 +74,31 @@ export function useData() {
   };
 
   const saveMoromiData = async (moromiDataList: MoromiData[], processList: MoromiProcess[]) => {
-    await saveToSupabase(moromiDataList, processList);
-    // 保存後にBY一覧を再取得して状態更新
-    const bys = await getAvailableBYs();
-    setAvailableBYs(bys);
-  };
-
-  const refreshBYs = async () => {
-    const bys = await getAvailableBYs();
-    setAvailableBYs(bys);
-    if (bys.length > 0 && !bys.includes(currentBY)) {
-      setCurrentBY(bys[0]);
-    }
-  };
+  console.log('===== saveMoromiData 開始 =====');
+  console.log('保存するデータ数:', moromiDataList.length);
+  
+  await saveToSupabase(moromiDataList, processList);
+  console.log('Supabase保存完了');
+  
+  // 保存後にBY一覧を再取得
+  const bys = await getAvailableBYs();
+  console.log('取得したBY一覧:', bys);
+  setAvailableBYs(bys);
+  
+  // 現在のBYのデータを再読み込み
+  console.log('現在のBY:', currentBY);
+  await loadMoromiByBY(currentBY);
+  console.log('データ再読み込み完了');
+  console.log('===== saveMoromiData 終了 =====');
+};
 
   return {
     isLoading,
     availableBYs,
     currentBY,
     setCurrentBY,
-    refreshBYs,
-    getMoromiByBY,
+    moromiData,
+    moromiProcesses,
     getProcessesByMoromi,
     getAllData,
     saveMoromiData,

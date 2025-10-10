@@ -68,8 +68,18 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto py-6">
-        {currentPage === 'dashboard' && <Dashboard currentBY={dataContext.currentBY} getMoromiByBY={dataContext.getMoromiByBY} getProcessesByMoromi={dataContext.getProcessesByMoromi} />}
-        {currentPage === 'csv-update' && <CSVUpdate onDataLoaded={dataContext.refreshBYs} getAllData={dataContext.getAllData} saveMoromiData={dataContext.saveMoromiData} />}
+        {currentPage === 'dashboard' && (
+          <Dashboard 
+            moromiData={dataContext.moromiData}
+            getProcessesByMoromi={dataContext.getProcessesByMoromi}
+          />
+        )}
+        {currentPage === 'csv-update' && (
+          <CSVUpdate 
+            getAllData={dataContext.getAllData} 
+            saveMoromiData={dataContext.saveMoromiData} 
+          />
+        )}
       </main>
     </div>
   );

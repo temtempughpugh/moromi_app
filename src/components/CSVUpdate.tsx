@@ -9,12 +9,11 @@ interface PreviewData {
 }
 
 interface CSVUpdateProps {
-  onDataLoaded: () => void;
   getAllData: () => Promise<{ moromiData: MoromiData[]; moromiProcesses: MoromiProcess[] }>;
   saveMoromiData: (moromiDataList: MoromiData[], processList: MoromiProcess[]) => Promise<void>;
 }
 
-export default function CSVUpdate({ onDataLoaded, getAllData, saveMoromiData }: CSVUpdateProps) {
+export default function CSVUpdate({ getAllData, saveMoromiData }: CSVUpdateProps) {
   const [updateDate, setUpdateDate] = useState<string>(
     new Date().toISOString().substring(0, 10)
   );
@@ -128,7 +127,6 @@ export default function CSVUpdate({ onDataLoaded, getAllData, saveMoromiData }: 
       ];
 
       await saveMoromiData(finalMoromiData, finalProcesses);
-      onDataLoaded();
 
       alert(`データを更新しました\n更新: ${preview.toUpdate.length}件\n保持: ${preview.toKeep.length}件`);
       setPreview(null);
