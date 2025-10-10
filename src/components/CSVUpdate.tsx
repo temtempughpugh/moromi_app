@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { parseCSV } from '../utils/csvParser';
-import { saveMoromiData, getAllData } from '../utils/database';
 import type { MoromiData, MoromiProcess } from '../utils/types';
 
 interface PreviewData {
@@ -9,7 +8,13 @@ interface PreviewData {
   updateDate: string;
 }
 
-export default function CSVUpdate({ onDataLoaded }: { onDataLoaded: () => void }) {
+interface CSVUpdateProps {
+  onDataLoaded: () => void;
+  getAllData: () => Promise<{ moromiData: MoromiData[]; moromiProcesses: MoromiProcess[] }>;
+  saveMoromiData: (moromiDataList: MoromiData[], processList: MoromiProcess[]) => Promise<void>;
+}
+
+export default function CSVUpdate({ onDataLoaded, getAllData, saveMoromiData }: CSVUpdateProps) {
   const [updateDate, setUpdateDate] = useState<string>(
     new Date().toISOString().substring(0, 10)
   );
@@ -25,7 +30,7 @@ export default function CSVUpdate({ onDataLoaded }: { onDataLoaded: () => void }
       setNewData({ moromiData, moromiProcesses });
 
       // プレビュー作成
-      const currentData = getAllData();
+      const currentData = await getAllData();
       const updateDateObj = new Date(updateDate);
 
       const toUpdate: string[] = [];
@@ -60,76 +65,79 @@ export default function CSVUpdate({ onDataLoaded }: { onDataLoaded: () => void }
     }
   };
 
-  const handleUpdate = () => {
-  if (!newData || !preview) return;
+  const handleUpdate = async () => {
+    if (!newData || !preview) return;
 
-  // 既存データを取得
-  const currentData = getAllData();
-  const updateDateObj = new Date(updateDate);
+    try {
+      // 既存データを取得
+      const currentData = await getAllData();
+      const updateDateObj = new Date(updateDate);
 
-  // 保持するデータ（更新日より前）
-  const keptMoromiData = currentData.moromiData.filter(m => {
-    const tomeDate = new Date(m.tomeDate);
-    return tomeDate < updateDateObj;
-  });
+      // 保持するデータ（更新日より前）
+      const keptMoromiData = currentData.moromiData.filter(m => {
+        const tomeDate = new Date(m.tomeDate);
+        return tomeDate < updateDateObj;
+      });
 
-  const keptProcesses = currentData.moromiProcesses.filter(p => {
-    // by + jungoId で既存のmoromiDataを探す
-    const moromi = currentData.moromiData.find(m => 
-      m.jungoId === p.jungoId && m.by === p.by
-    );
-    if (!moromi) return false;
-    const tomeDate = new Date(moromi.tomeDate);
-    return tomeDate < updateDateObj;
-  });
+      const keptProcesses = currentData.moromiProcesses.filter(p => {
+        const moromi = currentData.moromiData.find(m => 
+          m.jungoId === p.jungoId && m.by === p.by
+        );
+        if (!moromi) return false;
+        const tomeDate = new Date(moromi.tomeDate);
+        return tomeDate < updateDateObj;
+      });
 
-  // 新しいデータから更新日以降のみ抽出
-  const updatedMoromiData = newData.moromiData.filter(m => {
-    const tomeDate = new Date(m.tomeDate);
-    return tomeDate >= updateDateObj;
-  });
+      // 新しいデータから更新日以降のみ抽出
+      const updatedMoromiData = newData.moromiData.filter(m => {
+        const tomeDate = new Date(m.tomeDate);
+        return tomeDate >= updateDateObj;
+      });
 
-  const updatedProcesses = newData.moromiProcesses.filter(p => {
-    // by + jungoId で新しいmoromiDataを探す
-    const moromi = newData.moromiData.find(m => 
-      m.jungoId === p.jungoId && m.by === p.by
-    );
-    if (!moromi) return false;
-    const tomeDate = new Date(moromi.tomeDate);
-    return tomeDate >= updateDateObj;
-  });
+      const updatedProcesses = newData.moromiProcesses.filter(p => {
+        const moromi = newData.moromiData.find(m => 
+          m.jungoId === p.jungoId && m.by === p.by
+        );
+        if (!moromi) return false;
+        const tomeDate = new Date(moromi.tomeDate);
+        return tomeDate >= updateDateObj;
+      });
 
-  // マージ: 既存の保持データから、新しいデータと重複するものを除外
-  const finalMoromiData = [
-    ...keptMoromiData.filter(kept => 
-      !updatedMoromiData.some(updated => 
-        updated.by === kept.by && updated.jungoId === kept.jungoId
-      )
-    ),
-    ...updatedMoromiData
-  ].sort((a, b) => {
-    if (a.by !== b.by) return b.by - a.by; // BY降順
-    return parseInt(a.jungoId) - parseInt(b.jungoId); // 順号昇順
-  });
+      // マージ: 既存の保持データから、新しいデータと重複するものを除外
+      const finalMoromiData = [
+        ...keptMoromiData.filter(kept => 
+          !updatedMoromiData.some(updated => 
+            updated.by === kept.by && updated.jungoId === kept.jungoId
+          )
+        ),
+        ...updatedMoromiData
+      ].sort((a, b) => {
+        if (a.by !== b.by) return b.by - a.by;
+        return parseInt(a.jungoId) - parseInt(b.jungoId);
+      });
 
-  const finalProcesses = [
-    ...keptProcesses.filter(kept =>
-      !updatedProcesses.some(updated =>
-        updated.by === kept.by && 
-        updated.jungoId === kept.jungoId && 
-        updated.processType === kept.processType
-      )
-    ),
-    ...updatedProcesses
-  ];
+      const finalProcesses = [
+        ...keptProcesses.filter(kept =>
+          !updatedProcesses.some(updated =>
+            updated.by === kept.by && 
+            updated.jungoId === kept.jungoId && 
+            updated.processType === kept.processType
+          )
+        ),
+        ...updatedProcesses
+      ];
 
-  saveMoromiData(finalMoromiData, finalProcesses);
-  onDataLoaded();
+      await saveMoromiData(finalMoromiData, finalProcesses);
+      onDataLoaded();
 
-  alert(`データを更新しました\n更新: ${preview.toUpdate.length}件\n保持: ${preview.toKeep.length}件`);
-  setPreview(null);
-  setNewData(null);
-};
+      alert(`データを更新しました\n更新: ${preview.toUpdate.length}件\n保持: ${preview.toKeep.length}件`);
+      setPreview(null);
+      setNewData(null);
+    } catch (error) {
+      console.error('更新エラー:', error);
+      alert('データ更新に失敗しました');
+    }
+  };
 
   return (
     <div className="p-6 space-y-4">

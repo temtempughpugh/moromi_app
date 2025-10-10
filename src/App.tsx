@@ -1,26 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import CSVUpdate from './components/CSVUpdate';
-import { getAvailableBYs } from './utils/database';
+import { useData } from './hooks/useData';
 
 type Page = 'dashboard' | 'csv-update';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  const [availableBYs, setAvailableBYs] = useState<number[]>([]);
-  const [currentBY, setCurrentBY] = useState<number>(2025);
+  const dataContext = useData();
 
-  useEffect(() => {
-    loadBYs();
-  }, []);
-
-  const loadBYs = () => {
-    const bys = getAvailableBYs();
-    setAvailableBYs(bys);
-    if (bys.length > 0) {
-      setCurrentBY(bys[0]);
-    }
-  };
+  if (dataContext.isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-700 mx-auto mb-4"></div>
+          <p className="text-xl font-bold text-blue-900">データを読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
@@ -29,14 +27,14 @@ function App() {
           <div className="flex items-center justify-between h-20">
             <h1 className="text-3xl font-bold tracking-tight text-white">もろみ管理システム</h1>
             
-            {availableBYs.length > 0 && (
+            {dataContext.availableBYs.length > 0 && (
               <div className="flex items-center gap-3">
                 <select
-                  value={currentBY}
-                  onChange={(e) => setCurrentBY(Number(e.target.value))}
+                  value={dataContext.currentBY}
+                  onChange={(e) => dataContext.setCurrentBY(Number(e.target.value))}
                   className="px-4 py-2 bg-blue-800 border-2 border-blue-600 rounded-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-white"
                 >
-                  {availableBYs.map(year => (
+                  {dataContext.availableBYs.map(year => (
                     <option key={year} value={year}>BY{year}</option>
                   ))}
                 </select>
@@ -70,8 +68,8 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto py-6">
-        {currentPage === 'dashboard' && <Dashboard currentBY={currentBY} />}
-        {currentPage === 'csv-update' && <CSVUpdate onDataLoaded={loadBYs} />}
+        {currentPage === 'dashboard' && <Dashboard currentBY={dataContext.currentBY} getMoromiByBY={dataContext.getMoromiByBY} getProcessesByMoromi={dataContext.getProcessesByMoromi} />}
+        {currentPage === 'csv-update' && <CSVUpdate onDataLoaded={dataContext.refreshBYs} getAllData={dataContext.getAllData} saveMoromiData={dataContext.saveMoromiData} />}
       </main>
     </div>
   );

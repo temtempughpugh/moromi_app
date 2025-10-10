@@ -1,6 +1,12 @@
 import Papa from 'papaparse';
 import type { MoromiData, MoromiProcess, ProcessType } from './types';
 
+const originalWarn = console.warn;
+console.warn = (...args: any[]) => {
+  if (args[0]?.includes?.('Duplicate headers')) return;
+  originalWarn(...args);
+};
+
 // Excelシリアル値を日付に変換
 export function excelSerialToDate(serial: number): Date {
   const excelEpoch = new Date(1899, 11, 30);
@@ -38,7 +44,7 @@ export function convertProcessType(csvValue: string): ProcessType {
 // CSV読み込み
 export async function parseCSV(file: File): Promise<{ moromiData: MoromiData[], moromiProcesses: MoromiProcess[] }> {
   return new Promise((resolve, reject) => {
-    Papa.parse(file, {
+    Papa.parse<any>(file, {  // ← <any> を追加
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
