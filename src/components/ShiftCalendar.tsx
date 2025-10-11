@@ -42,6 +42,8 @@ export default function ShiftCalendar({
   const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
   const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [dragStart, setDragStart] = useState<{ staffId: string; date: string } | null>(null);
+const [dragValue, setDragValue] = useState<string | null>(null);
 
   const generateDates = () => {
     const dates: string[] = [];
@@ -130,7 +132,7 @@ export default function ShiftCalendar({
     
     const motoKake = processes.find(p => p.processType === 'motoKake');
     
-    if (motoKake && motoKake.shikomiDate === date) return 'モト';
+    if (motoKake && motoKake.kakeShikomiDate === date) return 'モト';
     
     if (moromi.motoOroshiDate === date) return '卸';
     if (moromi.soeShikomiDate === date) return '添';
@@ -186,6 +188,23 @@ export default function ShiftCalendar({
     };
 
     setLocalShifts({ ...localShifts, [key]: shift });
+  };
+
+const handleMouseDown = (staffId: string, date: string, value: string) => {
+    if (value === '') return;
+    setDragStart({ staffId, date });
+    setDragValue(value);
+  };
+
+  const handleMouseEnter = (staffId: string, date: string) => {
+    if (!dragStart || !dragValue) return;
+    if (staffId !== dragStart.staffId) return;
+    handleShiftChange(staffId, date, dragValue);
+  };
+
+  const handleMouseUp = () => {
+    setDragStart(null);
+    setDragValue(null);
   };
 
   const handleSave = async () => {
@@ -274,8 +293,8 @@ export default function ShiftCalendar({
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="p-6" onMouseUp={handleMouseUp}>
+      <div className="mb-4 flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
           <button
             onClick={handlePrevMonth}
@@ -291,28 +310,36 @@ export default function ShiftCalendar({
             次月 →
           </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
-        >
-          {isSaving ? '保存中...' : '保存'}
-        </button>
-      </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.print()}
+            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            印刷
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
+          >
+            {isSaving ? '保存中...' : '保存'}
+          </button>
+        </div>
+        </div>
 
       <div className="overflow-x-auto mb-8">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-[10px] table-fixed">
           <thead>
             <tr className="bg-gray-100">
-              <th className="border p-2 sticky left-0 bg-gray-100 z-10 min-w-32">号/項目</th>
+              <th className="border p-1 sticky left-0 bg-gray-100 z-10 w-20">号/項目</th>
               {dates.map((date) => (
-                <th key={date} className="border p-1 min-w-12">
+                <th key={date} className="border p-0.5 w-8">
                   {new Date(date).getDate()}
                 </th>
               ))}
-              <th className="border p-2">合計</th>
-              <th className="border p-2">所定</th>
-              <th className="border p-2">休日</th>
+<th className="border p-1 w-12">合計</th>
+<th className="border p-1 w-12">所定</th>
+<th className="border p-1 w-12">休日</th>
             </tr>
           </thead>
           <tbody>
@@ -322,8 +349,8 @@ export default function ShiftCalendar({
               
               return (
                 <tr key={moromi.jungoId}>
-                  <td className={`border p-2 font-medium sticky left-0 ${moromiColor} z-10`}>
-                    {moromi.jungoId}号 {moromi.brewingCategory}
+                  <td className={`border p-1 font-medium sticky left-0 ${moromiColor} z-10 text-[10px]`}>
+  {moromi.jungoId}号 {moromi.tankNo}タンク {moromi.brewingCategory}
                   </td>
                   {dates.map((date) => {
   const mark = getProcessMarkForDate(moromi, date);
@@ -350,8 +377,8 @@ export default function ShiftCalendar({
               {dates.map((date, i) => (
                 <td key={date} className="border p-1">
                   <input
-                    type="text"
-                    className="w-full text-center bg-transparent text-xs"
+  type="text"
+  className="w-full text-center bg-transparent text-[10px]"
                     value={localMemos[i] || memoRow?.memos[i] || ''}
                     onChange={(e) => {
                       const newMemos = [...(memoRow?.memos || Array(dates.length).fill(''))];
@@ -370,7 +397,7 @@ export default function ShiftCalendar({
               {dates.map((date, i) => (
                 <td key={date} className="border p-1">
                   <select
-                    className="w-full text-center bg-transparent text-xs"
+  className="w-full text-center bg-transparent text-[10px] appearance-none"
                     value={localRiceDeliveries[i] || riceDelivery?.deliveries[i] || ''}
                     onChange={(e) => {
                       const newDeliveries = [...(riceDelivery?.deliveries || Array(dates.length).fill(''))];
@@ -468,8 +495,8 @@ export default function ShiftCalendar({
               {dates.map((date, i) => (
                 <td key={date} className="border p-1">
                   <input
-                    type="number"
-                    className="w-full text-center bg-transparent text-xs"
+  type="number"
+  className="w-full text-center bg-transparent text-[10px]"
                     value={localMinimumStaff[i] || 3}
                     onChange={(e) => {
                       const newMinimum = [...localMinimumStaff];
@@ -522,12 +549,14 @@ export default function ShiftCalendar({
                       <td 
                         key={date} 
                         className={`border p-1 ${isEarly ? 'bg-blue-100' : ''}`}
+                        onMouseEnter={() => handleMouseEnter(staff.id, date)}  // ← この行を追加
                       >
-                        <select
-                          className={`w-full text-center border-0 bg-transparent text-xs ${isRest ? 'text-red-600 font-bold' : ''}`}
-                          value={value}
-                          onChange={(e) => handleShiftChange(staff.id, date, e.target.value)}
-                        >
+                       <select
+  className={`w-full text-center border-0 bg-transparent text-[10px] appearance-none ${isRest ? 'text-red-600 font-bold' : ''}`}
+  value={value}
+  onChange={(e) => handleShiftChange(staff.id, date, e.target.value)}
+  onMouseDown={() => handleMouseDown(staff.id, date, value)}
+>
                           <option value="">-</option>
                           <option value="normal-8.5">8.5</option>
                           <option value="normal-7">7</option>
@@ -550,8 +579,8 @@ export default function ShiftCalendar({
                   <td className="border p-2 text-center">{totalHours}</td>
                   <td className="border p-2">
                     <input
-                      type="number"
-                      className="w-full text-center text-xs"
+  type="number"
+  className="w-full text-center text-[10px]"
                       value={standardHours}
                       onChange={(e) => {
                         setLocalStandardHours({
@@ -570,7 +599,10 @@ export default function ShiftCalendar({
       </div>
 
       {/* スタッフ管理セクション */}
-      <StaffManagementSection staffList={staffList} saveStaff={saveStaff} deleteStaff={deleteStaff} />
+      {/* スタッフ管理セクション */}
+      <div className="no-print">
+        <StaffManagementSection staffList={staffList} saveStaff={saveStaff} deleteStaff={deleteStaff} />
+      </div>
     </div>
   );
 }
@@ -758,4 +790,105 @@ function StaffManagementSection({ staffList, saveStaff, deleteStaff }: StaffMana
       </div>
     </div>
   );
+}
+
+// 印刷用CSS
+const printStyles = `
+  @media print {
+    @page {
+      size: A3 landscape;
+      margin: 3mm;
+    }
+    
+    html, body {
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    
+    .no-print {
+      display: none !important;
+    }
+    
+    .p-6 {
+      padding: 0 !important;
+      margin: 0 !important;
+      height: 100% !important;
+    }
+    
+    .overflow-x-auto {
+      overflow: visible !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      height: 100% !important;
+    }
+    
+    .mb-8 {
+      margin: 0 !important;
+    }
+    
+    table {
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      table-layout: fixed !important;
+      font-size: 5.5px !important;
+      page-break-inside: avoid;
+      border-collapse: collapse !important;
+    }
+    
+    th:first-child, td:first-child {
+      width: 90px !important;
+      font-size: 5px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      padding: 0 2px !important;
+    }
+    
+    th:nth-last-child(-n+3), td:nth-last-child(-n+3) {
+      width: 25px !important;
+      padding: 0 1px !important;
+    }
+    
+    td, th {
+      padding: 0 1px !important;
+      border: 0.3px solid #666 !important;
+      line-height: 1 !important;
+      text-align: center !important;
+    }
+    
+    th {
+      font-size: 5.5px !important;
+      font-weight: 600 !important;
+      padding: 0.5px !important;
+    }
+    
+    .sticky {
+      position: static !important;
+    }
+    
+    select, input {
+      border: none !important;
+      font-size: 5.5px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      line-height: 1 !important;
+      text-align: center !important;
+    }
+    
+    select {
+      appearance: none !important;
+      -webkit-appearance: none !important;
+    }
+  }
+`;
+
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.textContent = printStyles;
+  document.head.appendChild(styleSheet);
 }

@@ -24,7 +24,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl">
+      <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl no-print">
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <h1 className="text-2xl font-bold">もろみ管理システム</h1>
