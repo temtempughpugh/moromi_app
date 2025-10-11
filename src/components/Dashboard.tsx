@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { MoromiData, MoromiProcess } from '../utils/types';
 import { Fragment } from 'react';
 
 interface DashboardProps {
-  currentBY: number;
-  getMoromiByBY: (by: number) => Promise<MoromiData[]>;
+  moromiData: MoromiData[];
+  moromiProcesses: MoromiProcess[];
   getProcessesByMoromi: (by: number, jungoId: string) => Promise<MoromiProcess[]>;
 }
 
@@ -18,37 +18,11 @@ interface TodayTask {
   brewingSize?: number;
 }
 
-export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoromi }: DashboardProps) {
+export default function Dashboard({ moromiData, moromiProcesses }: DashboardProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
-  const [moromiList, setMoromiList] = useState<MoromiData[]>([]);
-  const [allProcesses, setAllProcesses] = useState<{ [key: string]: MoromiProcess[] }>({});
   const [expandedJungo, setExpandedJungo] = useState<string | null>(null);
   const [processes, setProcesses] = useState<{ [key: string]: MoromiProcess[] }>({});
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadData();
-  }, [currentBY]);
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getMoromiByBY(currentBY);
-      setMoromiList(data);
-      
-      const processesMap: { [key: string]: MoromiProcess[] } = {};
-      for (const moromi of data) {
-        const processList = await getProcessesByMoromi(currentBY, moromi.jungoId);
-        processesMap[moromi.jungoId] = processList;
-      }
-      setAllProcesses(processesMap);
-    } catch (error) {
-      console.error('データ取得エラー:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const formatDate = (date: Date): string => {
     const days = ['日', '月', '火', '水', '木', '金', '土'];
@@ -89,8 +63,8 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
       joso: []
     };
 
-    moromiList.forEach(moromi => {
-      const processList = allProcesses[moromi.jungoId] || [];
+    moromiData.forEach((moromi: MoromiData) => {
+      const moromiProcessList = moromiProcesses.filter(p => p.jungoId === moromi.jungoId);
 
       if (isSameDate(moromi.motoOroshiDate, currentDate)) {
         tasks.motoOroshi.push({ jungoId: moromi.jungoId });
@@ -112,7 +86,7 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
         });
       }
 
-      processList.forEach(process => {
+      moromiProcessList.forEach((process: MoromiProcess) => {
         if (process.moriDate && isSameDate(process.moriDate, currentDate)) {
           tasks.mori.push({
             jungoId: moromi.jungoId,
@@ -188,17 +162,13 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
     return tasks.reduce((sum, task) => sum + (task.amount || 0), 0);
   };
 
-  const handleRowClick = async (jungoId: string) => {
+  const handleRowClick = (jungoId: string) => {
     if (expandedJungo === jungoId) {
       setExpandedJungo(null);
     } else {
-      try {
-        const processList = await getProcessesByMoromi(currentBY, jungoId);
-        setProcesses(prev => ({ ...prev, [jungoId]: processList }));
-        setExpandedJungo(jungoId);
-      } catch (error) {
-        console.error('工程データ取得エラー:', error);
-      }
+      const processList = moromiProcesses.filter(p => p.jungoId === jungoId);
+      setProcesses(prev => ({ ...prev, [jungoId]: processList }));
+      setExpandedJungo(jungoId);
     }
   };
 
@@ -230,14 +200,6 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
       </div>
     );
   };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 flex justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-700"></div>
-      </div>
-    );
-  }
 
   const todayTasks = getTodayTasks();
   const hasAnyTasks = Object.values(todayTasks).some(tasks => tasks.length > 0);
@@ -282,218 +244,213 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
           📅 本日の予定
         </h3>
 
-        {/* 第1行: 2列 */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-  {/* 左列 */}
-  <div className="space-y-4">
-    <TaskSection
-      title="🏺 引き込み"
-      tasks={todayTasks.hikomi}
-      renderContent={(tasks) => {
-        const total = calculateTotal(tasks);
-        return (
-          <>
-            {tasks.map((task, index) => (
-              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
-                  {getProcessName(task.processType || '')}
-                </span>
-                <span className="ml-2 font-bold">{task.amount}kg</span>
-                <span className="ml-1 text-gray-500">({task.riceType})</span>
-              </div>
-            ))}
-            <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-              <span className="font-bold">合計: {total}kg</span>
-            </div>
-          </>
-        );
-      }}
-    />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="space-y-4">
+            <TaskSection
+              title="🏺 引き込み"
+              tasks={todayTasks.hikomi}
+              renderContent={(tasks) => {
+                const total = calculateTotal(tasks);
+                return (
+                  <>
+                    {tasks.map((task, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                        <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                        <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                          {getProcessName(task.processType || '')}
+                        </span>
+                        <span className="ml-2 font-bold">{task.amount}kg</span>
+                        <span className="ml-1 text-gray-500">({task.riceType})</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                      <span className="font-bold">合計: {total}kg</span>
+                    </div>
+                  </>
+                );
+              }}
+            />
 
-    <TaskSection
-      title="⚗️ 仕込み"
-      tasks={todayTasks.shikomi}
-      renderContent={(tasks) => {
-        const processOrder = ['motoKake', 'soeKake', 'nakaKake', 'tomeKake', 'yodan'];
-        const sortedTasks = [...tasks].sort((a, b) => {
-          const orderA = processOrder.indexOf(a.processType || '');
-          const orderB = processOrder.indexOf(b.processType || '');
-          return orderA - orderB;
-        });
-        
-        return (
-          <>
-            {sortedTasks.map((task, index) => (
-              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
-                  {getProcessName(task.processType || '')}
-                </span>
-                <span className="ml-2 font-bold">{task.amount}kg</span>
-                <span className="ml-1 text-gray-500">({task.riceType})</span>
-              </div>
-            ))}
-          </>
-        );
-      }}
-    />
+            <TaskSection
+              title="⚗️ 仕込み"
+              tasks={todayTasks.shikomi}
+              renderContent={(tasks) => {
+                const processOrder = ['motoKake', 'soeKake', 'nakaKake', 'tomeKake', 'yodan'];
+                const sortedTasks = [...tasks].sort((a, b) => {
+                  const orderA = processOrder.indexOf(a.processType || '');
+                  const orderB = processOrder.indexOf(b.processType || '');
+                  return orderA - orderB;
+                });
+                
+                return (
+                  <>
+                    {sortedTasks.map((task, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                        <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
+                          {getProcessName(task.processType || '')}
+                        </span>
+                        <span className="ml-2 font-bold">{task.amount}kg</span>
+                        <span className="ml-1 text-gray-500">({task.riceType})</span>
+                      </div>
+                    ))}
+                  </>
+                );
+              }}
+            />
 
-    <TaskSection
-      title="🌾 洗米"
-      tasks={todayTasks.senmai}
-      renderContent={(tasks) => {
-        const processOrder = ['motoKoji', 'motoKake', 'soeKoji', 'soeKake', 'nakaKoji', 'nakaKake', 'tomeKoji', 'tomeKake', 'yodan'];
-        const sortedTasks = [...tasks].sort((a, b) => {
-          const orderA = processOrder.indexOf(a.processType || '');
-          const orderB = processOrder.indexOf(b.processType || '');
-          return orderA - orderB;
-        });
-        
-        const kojiTasks = sortedTasks.filter(t => t.processType?.includes('Koji'));
-        const otherTasks = sortedTasks.filter(t => !t.processType?.includes('Koji'));
-        const kojiTotal = calculateTotal(kojiTasks);
-        
-        return (
-          <>
-            {kojiTasks.map((task, index) => (
-              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold">
-                  {getProcessName(task.processType || '')}
-                </span>
-                <span className="ml-2 font-bold">{task.amount}kg</span>
-                <span className="ml-1 text-gray-500">({task.riceType})</span>
-              </div>
-            ))}
-            <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-              <span className="font-bold">合計: {kojiTotal}kg</span>
-            </div>
-            {otherTasks.map((task, index) => (
-              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold">
-                  {getProcessName(task.processType || '')}
-                </span>
-                <span className="ml-2 font-bold">{task.amount}kg</span>
-                <span className="ml-1 text-gray-500">({task.riceType})</span>
-              </div>
-            ))}
-          </>
-        );
-      }}
-    />
-  </div>
-
-  {/* 右列 */}
-  <div className="space-y-4">
-    <TaskSection
-      title="🌾 盛り"
-      tasks={todayTasks.mori}
-      renderContent={(tasks) => {
-        const total = calculateTotal(tasks);
-        return (
-          <>
-            {tasks.map((task, index) => (
-              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-semibold">
-                  {getProcessName(task.processType || '')}
-                </span>
-                <span className="ml-2 font-bold">{task.amount}kg</span>
-                <span className="ml-1 text-gray-500">({task.riceType})</span>
-              </div>
-            ))}
-            <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-              <span className="font-bold">合計: {total}kg</span>
-            </div>
-          </>
-        );
-      }}
-    />
-
-    <TaskSection
-      title="✨ 出麹"
-      tasks={todayTasks.dekoji}
-      renderContent={(tasks) => {
-        const total = calculateTotal(tasks);
-        return (
-          <>
-            {tasks.map((task, index) => (
-              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
-                  {getProcessName(task.processType || '')}
-                </span>
-                <span className="ml-2 font-bold">{task.amount}kg</span>
-                <span className="ml-1 text-gray-500">({task.riceType})</span>
-              </div>
-            ))}
-            <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-              <span className="font-bold">合計: {total}kg</span>
-            </div>
-          </>
-        );
-      }}
-    />
-  </div>
-</div>
-
-{/* 第2行: 2列・高さ揃え */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-  <TaskSection
-    title="🍶 酒母卸"
-    tasks={todayTasks.motoOroshi}
-    renderContent={(tasks) => (
-      <>
-        {tasks.map((task, index) => (
-          <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-            <span className="font-bold text-blue-600">{task.jungoId}号</span>
+            <TaskSection
+              title="🌾 洗米"
+              tasks={todayTasks.senmai}
+              renderContent={(tasks) => {
+                const processOrder = ['motoKoji', 'motoKake', 'soeKoji', 'soeKake', 'nakaKoji', 'nakaKake', 'tomeKoji', 'tomeKake', 'yodan'];
+                const sortedTasks = [...tasks].sort((a, b) => {
+                  const orderA = processOrder.indexOf(a.processType || '');
+                  const orderB = processOrder.indexOf(b.processType || '');
+                  return orderA - orderB;
+                });
+                
+                const kojiTasks = sortedTasks.filter(t => t.processType?.includes('Koji'));
+                const otherTasks = sortedTasks.filter(t => !t.processType?.includes('Koji'));
+                const kojiTotal = calculateTotal(kojiTasks);
+                
+                return (
+                  <>
+                    {kojiTasks.map((task, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                        <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold">
+                          {getProcessName(task.processType || '')}
+                        </span>
+                        <span className="ml-2 font-bold">{task.amount}kg</span>
+                        <span className="ml-1 text-gray-500">({task.riceType})</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                      <span className="font-bold">合計: {kojiTotal}kg</span>
+                    </div>
+                    {otherTasks.map((task, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                        <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold">
+                          {getProcessName(task.processType || '')}
+                        </span>
+                        <span className="ml-2 font-bold">{task.amount}kg</span>
+                        <span className="ml-1 text-gray-500">({task.riceType})</span>
+                      </div>
+                    ))}
+                  </>
+                );
+              }}
+            />
           </div>
-        ))}
-      </>
-    )}
-  />
 
-  <TaskSection
-    title="🔨 枝打ち"
-    tasks={todayTasks.edauchi}
-    renderContent={(tasks) => (
-      <>
-        {tasks.map((task, index) => (
-          <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-            <span className="font-bold text-blue-600">{task.jungoId}号</span>
-            <span className="ml-2 text-gray-600">{task.tankNo}</span>
-          </div>
-        ))}
-      </>
-    )}
-  />
-</div>
+          <div className="space-y-4">
+            <TaskSection
+              title="🌾 盛り"
+              tasks={todayTasks.mori}
+              renderContent={(tasks) => {
+                const total = calculateTotal(tasks);
+                return (
+                  <>
+                    {tasks.map((task, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                        <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                          {getProcessName(task.processType || '')}
+                        </span>
+                        <span className="ml-2 font-bold">{task.amount}kg</span>
+                        <span className="ml-1 text-gray-500">({task.riceType})</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                      <span className="font-bold">合計: {total}kg</span>
+                    </div>
+                  </>
+                );
+              }}
+            />
 
-{/* 第3行: 全幅 */}
-<TaskSection
-  title="🍶 上槽"
-  tasks={todayTasks.joso}
-  renderContent={(tasks) => (
-    <>
-      {tasks.map((task, index) => (
-        <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm flex items-center justify-between">
-          <div>
-            <span className="font-bold text-blue-600">{task.jungoId}号</span>
-            <span className="ml-2 text-gray-600">{task.tankNo}</span>
-            <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">
-              {task.brewingCategory}
-            </span>
+            <TaskSection
+              title="✨ 出麹"
+              tasks={todayTasks.dekoji}
+              renderContent={(tasks) => {
+                const total = calculateTotal(tasks);
+                return (
+                  <>
+                    {tasks.map((task, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                        <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                        <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
+                          {getProcessName(task.processType || '')}
+                        </span>
+                        <span className="ml-2 font-bold">{task.amount}kg</span>
+                        <span className="ml-1 text-gray-500">({task.riceType})</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                      <span className="font-bold">合計: {total}kg</span>
+                    </div>
+                  </>
+                );
+              }}
+            />
           </div>
-          <span className="text-gray-600 text-xs">
-            仕込規模: {task.brewingSize}kg
-          </span>
         </div>
-      ))}
-    </>
-  )}
-/>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <TaskSection
+            title="🍶 酒母卸"
+            tasks={todayTasks.motoOroshi}
+            renderContent={(tasks) => (
+              <>
+                {tasks.map((task, index) => (
+                  <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                    <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                  </div>
+                ))}
+              </>
+            )}
+          />
+
+          <TaskSection
+            title="🔨 枝打ち"
+            tasks={todayTasks.edauchi}
+            renderContent={(tasks) => (
+              <>
+                {tasks.map((task, index) => (
+                  <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                    <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                    <span className="ml-2 text-gray-600">{task.tankNo}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          />
+        </div>
+
+        <TaskSection
+          title="🍶 上槽"
+          tasks={todayTasks.joso}
+          renderContent={(tasks) => (
+            <>
+              {tasks.map((task, index) => (
+                <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                    <span className="ml-2 text-gray-600">{task.tankNo}</span>
+                    <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                      {task.brewingCategory}
+                    </span>
+                  </div>
+                  <span className="text-gray-600 text-xs">
+                    仕込規模: {task.brewingSize}kg
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        />
 
         {!hasAnyTasks && (
           <div className="text-center py-6 text-gray-400 text-sm">
@@ -521,7 +478,7 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
               </tr>
             </thead>
             <tbody>
-              {moromiList.map((moromi) => {
+              {moromiData.map((moromi: MoromiData) => {
                 const moromiDays = calculateMoromiDays(moromi.tomeDate, moromi.josoDate);
                 return (
                   <Fragment key={moromi.jungoId}>
@@ -571,7 +528,7 @@ export default function Dashboard({ currentBY, getMoromiByBY, getProcessesByMoro
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {processes[moromi.jungoId]?.map((process) => (
+                                  {processes[moromi.jungoId]?.map((process: MoromiProcess) => (
                                     <tr key={`${process.processType}-${process.senmaiDate}`} className="border-b">
                                       <td className="px-2 py-1">{getProcessName(process.processType)}</td>
                                       <td className="px-2 py-1">{process.riceType}</td>

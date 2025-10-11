@@ -81,36 +81,31 @@ export default function App() {
                 ))}
               </select>
             </div>
-            <Dashboard
-              currentBY={dataContext.currentBY}
-              getMoromiByBY={() => Promise.resolve(dataContext.moromiData)}
-              getProcessesByMoromi={dataContext.getProcessesByMoromi}
-            />
+           <Dashboard
+  moromiData={dataContext.moromiData}
+  moromiProcesses={dataContext.moromiProcesses}
+  getProcessesByMoromi={dataContext.getProcessesByMoromi}
+/>
           </>
         )}
 
         {currentPage === 'shift' && (
-          <>
-            <ShiftCalendar
-              currentShiftMonth={dataContext.currentShiftMonth}
-              setCurrentShiftMonth={dataContext.setCurrentShiftMonth}
-              staffList={dataContext.staffList}
-              shifts={dataContext.shifts}
-              monthlySettings={dataContext.monthlySettings}
-              memoRow={dataContext.memoRow}
-              riceDelivery={dataContext.riceDelivery}
-              saveShifts={dataContext.saveShifts}
-              saveMonthlySettings={dataContext.saveMonthlySettings}
-              saveMemoRow={dataContext.saveMemoRow}
-              saveRiceDelivery={dataContext.saveRiceDelivery}
-            />
-            <StaffManagement
-              staffList={dataContext.staffList}
-              saveStaff={dataContext.saveStaff}
-              deleteStaff={dataContext.deleteStaff}
-            />
-          </>
-        )}
+  <ShiftCalendar
+    currentShiftMonth={dataContext.currentShiftMonth}
+    setCurrentShiftMonth={dataContext.setCurrentShiftMonth}
+    staffList={dataContext.staffList}
+    shifts={dataContext.shifts}
+    monthlySettings={dataContext.monthlySettings}
+    memoRow={dataContext.memoRow}
+    riceDelivery={dataContext.riceDelivery}
+    moromiData={dataContext.moromiData}
+    moromiProcesses={dataContext.moromiProcesses}
+    saveShifts={dataContext.saveShifts}
+    saveMonthlySettings={dataContext.saveMonthlySettings}
+    saveMemoRow={dataContext.saveMemoRow}
+    saveRiceDelivery={dataContext.saveRiceDelivery}
+  />
+)}
 
         {currentPage === 'csv-update' && (
           <CSVUpdate 
