@@ -1,88 +1,124 @@
-import { useState } from 'react';
+import { useState } from 'react'; 
 import Dashboard from './components/Dashboard';
 import CSVUpdate from './components/CSVUpdate';
+import ShiftCalendar from './components/ShiftCalendar';
+import StaffManagement from './components/StaffManagement';
 import { useData } from './hooks/useData';
 
-type Page = 'dashboard' | 'csv-update';
+type Page = 'dashboard' | 'csv-update' | 'shift';
 
-function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+export default function App() {
   const dataContext = useData();
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
   if (dataContext.isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-700 mx-auto mb-4"></div>
-          <p className="text-xl font-bold text-blue-900">データを読み込み中...</p>
+          <div className="animate-spin rounded-full h-20 w-20 border-4 border-blue-600 border-t-transparent mx-auto mb-6"></div>
+          <p className="text-slate-600 text-lg font-medium">データを読み込み中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
-      <header className="bg-gradient-to-r from-blue-700 to-blue-900 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-20">
-            <h1 className="text-3xl font-bold tracking-tight text-white">もろみ管理システム</h1>
-            
-            {dataContext.availableBYs.length > 0 && (
-              <div className="flex items-center gap-3">
-                <select
-                  value={dataContext.currentBY}
-                  onChange={(e) => dataContext.setCurrentBY(Number(e.target.value))}
-                  className="px-4 py-2 bg-blue-800 border-2 border-blue-600 rounded-lg font-bold text-white focus:outline-none focus:ring-2 focus:ring-white"
-                >
-                  {dataContext.availableBYs.map(year => (
-                    <option key={year} value={year}>BY{year}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            
-            <div className="flex gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
+            <h1 className="text-2xl font-bold">もろみ管理システム</h1>
+            <div className="flex gap-4">
               <button
                 onClick={() => setCurrentPage('dashboard')}
-                className={`px-5 py-2.5 rounded-lg font-bold transition-all duration-200 ${
+                className={`px-4 py-2 rounded transition ${
                   currentPage === 'dashboard'
-                    ? 'bg-white text-blue-700 shadow-lg'
-                    : 'bg-blue-800 hover:bg-blue-700 text-blue-100'
+                    ? 'bg-white text-blue-900 font-bold'
+                    : 'hover:bg-blue-800'
                 }`}
               >
-                📊 ダッシュボード
+                ダッシュボード
+              </button>
+              <button
+                onClick={() => setCurrentPage('shift')}
+                className={`px-4 py-2 rounded transition ${
+                  currentPage === 'shift'
+                    ? 'bg-white text-blue-900 font-bold'
+                    : 'hover:bg-blue-800'
+                }`}
+              >
+                シフト表
               </button>
               <button
                 onClick={() => setCurrentPage('csv-update')}
-                className={`px-5 py-2.5 rounded-lg font-bold transition-all duration-200 ${
+                className={`px-4 py-2 rounded transition ${
                   currentPage === 'csv-update'
-                    ? 'bg-white text-blue-700 shadow-lg'
-                    : 'bg-blue-800 hover:bg-blue-700 text-blue-100'
+                    ? 'bg-white text-blue-900 font-bold'
+                    : 'hover:bg-blue-800'
                 }`}
               >
-                🔄 CSV更新
+                CSV更新
               </button>
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="max-w-7xl mx-auto py-6">
+      <main className="container mx-auto px-6 py-8">
         {currentPage === 'dashboard' && (
-          <Dashboard 
-            moromiData={dataContext.moromiData}
-            getProcessesByMoromi={dataContext.getProcessesByMoromi}
-          />
+          <>
+            <div className="mb-6 flex items-center gap-4">
+              <label className="text-lg font-semibold text-slate-700">醸造年度:</label>
+              <select
+                value={dataContext.currentBY}
+                onChange={(e) => dataContext.setCurrentBY(Number(e.target.value))}
+                className="px-4 py-2 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {dataContext.availableBYs.map((by) => (
+                  <option key={by} value={by}>
+                    {by}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Dashboard
+              currentBY={dataContext.currentBY}
+              getMoromiByBY={() => Promise.resolve(dataContext.moromiData)}
+              getProcessesByMoromi={dataContext.getProcessesByMoromi}
+            />
+          </>
         )}
+
+        {currentPage === 'shift' && (
+          <>
+            <ShiftCalendar
+              currentShiftMonth={dataContext.currentShiftMonth}
+              setCurrentShiftMonth={dataContext.setCurrentShiftMonth}
+              staffList={dataContext.staffList}
+              shifts={dataContext.shifts}
+              monthlySettings={dataContext.monthlySettings}
+              memoRow={dataContext.memoRow}
+              riceDelivery={dataContext.riceDelivery}
+              saveShifts={dataContext.saveShifts}
+              saveMonthlySettings={dataContext.saveMonthlySettings}
+              saveMemoRow={dataContext.saveMemoRow}
+              saveRiceDelivery={dataContext.saveRiceDelivery}
+            />
+            <StaffManagement
+              staffList={dataContext.staffList}
+              saveStaff={dataContext.saveStaff}
+              deleteStaff={dataContext.deleteStaff}
+            />
+          </>
+        )}
+
         {currentPage === 'csv-update' && (
           <CSVUpdate 
-            getAllData={dataContext.getAllData} 
-            saveMoromiData={dataContext.saveMoromiData} 
+            saveMoromiData={dataContext.saveMoromiData}
+            getAllData={dataContext.getAllData}
           />
         )}
       </main>
     </div>
   );
 }
-
-export default App;

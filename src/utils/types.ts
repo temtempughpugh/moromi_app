@@ -44,3 +44,48 @@ export type ProcessType =
   | 'tomeKoji'
   | 'tomeKake'
   | 'yodan';
+
+  // シフト関連の型定義
+
+export interface Staff {
+  id: string;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Shift {
+  id: string;
+  date: string;
+  staffId: string;
+  shiftType: 'normal' | 'early';
+  workHours: 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null;
+  memo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonthlySettings {
+  yearMonth: string;
+  staffId: string;
+  standardWorkHours: number;
+  minimumStaff: number[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MemoRow {
+  yearMonth: string;
+  memos: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RiceDelivery {
+  yearMonth: string;
+  deliveries: ('◯' | '⚫️' | '')[];
+  createdAt: string;
+  updatedAt: string;
+}

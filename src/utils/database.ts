@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { MoromiData, MoromiProcess } from './types';
+import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from './types';
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
@@ -178,3 +179,208 @@ export async function isDatabaseEmpty(): Promise<boolean> {
 
   return count === 0;
 }
+
+// スタッフ関連
+// ============================================
+
+export const getAllStaff = async (): Promise<Staff[]> => {
+  const { data, error } = await supabase
+    .from('staff')
+    .select('*')
+    .order('display_order', { ascending: true });
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    id: row.id,
+    name: row.name,
+    displayOrder: row.display_order,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const saveStaff = async (staff: Omit<Staff, 'createdAt' | 'updatedAt'>): Promise<void> => {
+  const { error } = await supabase
+    .from('staff')
+    .upsert({
+      id: staff.id,
+      name: staff.name,
+      display_order: staff.displayOrder,
+      is_active: staff.isActive,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) throw error;
+};
+
+export const deleteStaff = async (staffId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('staff')
+    .delete()
+    .eq('id', staffId);
+
+  if (error) throw error;
+};
+
+// ============================================
+// シフト関連
+// ============================================
+
+export const getShiftsByMonth = async (yearMonth: string): Promise<Shift[]> => {
+  const startDate = `${yearMonth}-01`;
+  const endDate = `${yearMonth}-31`;
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('*')
+    .gte('date', startDate)
+    .lte('date', endDate);
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    id: row.id,
+    date: row.date,
+    staffId: row.staff_id,
+    shiftType: row.shift_type,
+    workHours: row.work_hours,
+    memo: row.memo,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const saveShifts = async (shifts: Omit<Shift, 'createdAt' | 'updatedAt'>[]): Promise<void> => {
+  const records = shifts.map(shift => ({
+    id: shift.id,
+    date: shift.date,
+    staff_id: shift.staffId,
+    shift_type: shift.shiftType,
+    work_hours: shift.workHours,
+    memo: shift.memo,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from('shifts')
+    .upsert(records);
+
+  if (error) throw error;
+};
+
+export const deleteShift = async (shiftId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('shifts')
+    .delete()
+    .eq('id', shiftId);
+
+  if (error) throw error;
+};
+
+// ============================================
+// 月別設定関連
+// ============================================
+
+export const getMonthlySettings = async (yearMonth: string): Promise<MonthlySettings[]> => {
+  const { data, error } = await supabase
+    .from('monthly_settings')
+    .select('*')
+    .eq('year_month', yearMonth);
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    yearMonth: row.year_month,
+    staffId: row.staff_id,
+    standardWorkHours: row.standard_work_hours,
+    minimumStaff: row.minimum_staff,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const saveMonthlySettings = async (settings: Omit<MonthlySettings, 'createdAt' | 'updatedAt'>[]): Promise<void> => {
+  const records = settings.map(s => ({
+    year_month: s.yearMonth,
+    staff_id: s.staffId,
+    standard_work_hours: s.standardWorkHours,
+    minimum_staff: s.minimumStaff,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from('monthly_settings')
+    .upsert(records);
+
+  if (error) throw error;
+};
+
+// ============================================
+// メモ行関連
+// ============================================
+
+export const getMemoRow = async (yearMonth: string): Promise<MemoRow | null> => {
+  const { data, error } = await supabase
+    .from('memo_rows')
+    .select('*')
+    .eq('year_month', yearMonth)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    yearMonth: data.year_month,
+    memos: data.memos,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+};
+
+export const saveMemoRow = async (memoRow: Omit<MemoRow, 'createdAt' | 'updatedAt'>): Promise<void> => {
+  const { error } = await supabase
+    .from('memo_rows')
+    .upsert({
+      year_month: memoRow.yearMonth,
+      memos: memoRow.memos,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) throw error;
+};
+
+// ============================================
+// 米入荷関連
+// ============================================
+
+export const getRiceDelivery = async (yearMonth: string): Promise<RiceDelivery | null> => {
+  const { data, error } = await supabase
+    .from('rice_deliveries')
+    .select('*')
+    .eq('year_month', yearMonth)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    yearMonth: data.year_month,
+    deliveries: data.deliveries,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+};
+
+export const saveRiceDelivery = async (riceDelivery: Omit<RiceDelivery, 'createdAt' | 'updatedAt'>): Promise<void> => {
+  const { error } = await supabase
+    .from('rice_deliveries')
+    .upsert({
+      year_month: riceDelivery.yearMonth,
+      deliveries: riceDelivery.deliveries,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) throw error;
+};
