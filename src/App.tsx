@@ -104,6 +104,8 @@ export default function App() {
     saveMonthlySettings={dataContext.saveMonthlySettings}
     saveMemoRow={dataContext.saveMemoRow}
     saveRiceDelivery={dataContext.saveRiceDelivery}
+    saveStaff={dataContext.saveStaff}
+  deleteStaff={dataContext.deleteStaff}
   />
 )}
 

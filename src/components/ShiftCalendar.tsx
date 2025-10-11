@@ -15,6 +15,8 @@ interface ShiftCalendarProps {
   saveMonthlySettings: (settings: Omit<MonthlySettings, 'createdAt' | 'updatedAt'>[]) => Promise<void>;
   saveMemoRow: (memoRow: Omit<MemoRow, 'createdAt' | 'updatedAt'>) => Promise<void>;
   saveRiceDelivery: (riceDelivery: Omit<RiceDelivery, 'createdAt' | 'updatedAt'>) => Promise<void>;
+  saveStaff: (staff: Omit<Staff, 'createdAt' | 'updatedAt'>) => Promise<void>;
+  deleteStaff: (staffId: string) => Promise<void>;
 }
 
 export default function ShiftCalendar({
@@ -31,11 +33,14 @@ export default function ShiftCalendar({
   saveMonthlySettings,
   saveMemoRow,
   saveRiceDelivery,
+  saveStaff,
+  deleteStaff,
 }: ShiftCalendarProps) {
   const [localShifts, setLocalShifts] = useState<Record<string, Shift>>({});
   const [localMemos, setLocalMemos] = useState<string[]>([]);
   const [localRiceDeliveries, setLocalRiceDeliveries] = useState<('◯' | '⚫️' | '')[]>([]);
   const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
+  const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   const generateDates = () => {
@@ -57,6 +62,85 @@ export default function ShiftCalendar({
   };
 
   const dates = generateDates();
+
+  const colors = [
+    'bg-red-200',
+    'bg-blue-200', 
+    'bg-green-200',
+    'bg-yellow-200',
+    'bg-purple-200',
+    'bg-pink-200',
+    'bg-orange-200',
+    'bg-teal-200'
+  ];
+
+  const getRelevantMoromi = () => {
+    const [year, month] = currentShiftMonth.split('-').map(Number);
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 5);
+
+    return moromiData.filter(m => {
+      const tomeDate = new Date(m.tomeDate);
+      const josoDate = new Date(m.josoDate);
+      return (tomeDate <= monthEnd && josoDate >= monthStart);
+    }).sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId));
+  };
+
+  const relevantMoromi = getRelevantMoromi();
+
+  const getMoromiColor = (moromi: MoromiData, index: number): string => {
+    if (index === 0) return colors[0];
+    
+    const prevMoromi = relevantMoromi[index - 1];
+    if (moromi.brewingCategory === prevMoromi.brewingCategory) {
+      return getMoromiColor(prevMoromi, index - 1);
+    }
+    
+    const usedColorIndices = new Set<number>();
+    for (let i = 0; i < index; i++) {
+      const colorIndex = colors.indexOf(getMoromiColor(relevantMoromi[i], i));
+      usedColorIndices.add(colorIndex);
+    }
+    
+    for (let i = 0; i < colors.length; i++) {
+      if (!usedColorIndices.has(i)) {
+        return colors[i];
+      }
+    }
+    
+    return colors[index % colors.length];
+  };
+
+  const getMoromiForDate = (date: string) => {
+    return relevantMoromi.filter(m => {
+      const processes = moromiProcesses.filter(p => p.jungoId === m.jungoId);
+      const motoKake = processes.find(p => p.processType === 'motoKake');
+      
+      if (!motoKake || !motoKake.kakeShikomiDate) return false;
+      
+      const startDate = new Date(motoKake.kakeShikomiDate);
+      const endDate = new Date(m.josoDate);
+      const currentDate = new Date(date);
+      return currentDate >= startDate && currentDate <= endDate;
+    });
+  };
+
+  const getProcessMarkForDate = (moromi: MoromiData, date: string): string => {
+    const processes = moromiProcesses.filter(p => p.jungoId === moromi.jungoId);
+    
+    const motoKake = processes.find(p => p.processType === 'motoKake');
+    
+    if (motoKake && motoKake.shikomiDate === date) return 'モト';
+    
+    if (moromi.motoOroshiDate === date) return '卸';
+    if (moromi.soeShikomiDate === date) return '添';
+    if (moromi.uchikomiDate === date) return '打';
+    if (moromi.nakaShikomiDate === date) return '仲';
+    if (moromi.tomeShikomiDate === date) return '留';
+    if (moromi.yodanShikomiDate && moromi.yodanShikomiDate === date) return '四';
+    if (moromi.josoDate === date) return '上';
+    return '';
+  };
 
   const handlePrevMonth = () => {
     const [year, month] = currentShiftMonth.split('-').map(Number);
@@ -108,15 +192,30 @@ export default function ShiftCalendar({
     setIsSaving(true);
     try {
       await saveShifts(Object.values(localShifts));
+      
       if (localMemos.length > 0) {
         await saveMemoRow({ yearMonth: currentShiftMonth, memos: localMemos });
       }
+      
       if (localRiceDeliveries.length > 0) {
         await saveRiceDelivery({ yearMonth: currentShiftMonth, deliveries: localRiceDeliveries });
       }
+      
+      if (Object.keys(localStandardHours).length > 0 || localMinimumStaff.length > 0) {
+        const settings = staffList.map(staff => ({
+          yearMonth: currentShiftMonth,
+          staffId: staff.id,
+          standardWorkHours: localStandardHours[staff.id] || getStandardHours(staff.id),
+          minimumStaff: localMinimumStaff.length > 0 ? localMinimumStaff : Array(dates.length).fill(3),
+        }));
+        await saveMonthlySettings(settings);
+      }
+      
       setLocalShifts({});
       setLocalMemos([]);
       setLocalRiceDeliveries([]);
+      setLocalStandardHours({});
+      setLocalMinimumStaff([]);
       alert('保存しました');
     } catch (error) {
       console.error('保存エラー:', error);
@@ -126,32 +225,21 @@ export default function ShiftCalendar({
     }
   };
 
-  const getMoromiWork = (date: string): string => {
-    const moromi = moromiData.find(m => 
-      m.uchikomiDate === date || m.josoDate === date
-    );
-    
-    if (!moromi) return '';
-    if (moromi.uchikomiDate === date) return '打';
-    if (moromi.josoDate === date) return '上';
-    return '';
-  };
-
   const getKojiAmount = (date: string): number => {
     const processes = moromiProcesses.filter(p => 
-      p.hikomiDate === date && p.processType.includes('Koji')
+      p.hikomiDate && p.hikomiDate.includes(date.substring(5)) && p.processType.includes('Koji')
     );
     return processes.reduce((sum, p) => sum + (p.amount || 0), 0);
   };
 
   const getSteaming = (date: string): string => {
     const hasKoji = moromiProcesses.some(p => 
-      p.hikomiDate === date && p.processType.includes('Koji')
+      p.hikomiDate && p.hikomiDate.includes(date.substring(5)) && p.processType.includes('Koji')
     );
     if (hasKoji) return '麹';
     
     const hasKake = moromiProcesses.some(p => 
-      p.kakeShikomiDate === date
+      p.kakeShikomiDate && p.kakeShikomiDate.includes(date.substring(5))
     );
     if (hasKake) return '◯';
     
@@ -159,12 +247,12 @@ export default function ShiftCalendar({
   };
 
   const getMori = (date: string): string => {
-    const hasMori = moromiProcesses.some(p => p.moriDate === date);
+    const hasMori = moromiProcesses.some(p => p.moriDate && p.moriDate.includes(date.substring(5)));
     return hasMori ? '盛' : '';
   };
 
   const getDekoji = (date: string): string => {
-    const hasDekoji = moromiProcesses.some(p => p.dekojiDate === date);
+    const hasDekoji = moromiProcesses.some(p => p.dekojiDate && p.dekojiDate.includes(date.substring(5)));
     return hasDekoji ? '出' : '';
   };
 
@@ -177,6 +265,12 @@ export default function ShiftCalendar({
 
   const getSurplus = (date: string, minimum: number): number => {
     return getWorkingStaffCount(date) - minimum;
+  };
+
+  const getStandardHours = (staffId: string): number => {
+    if (localStandardHours[staffId]) return localStandardHours[staffId];
+    const settings = monthlySettings.find(ms => ms.staffId === staffId);
+    return settings?.standardWorkHours || 208;
   };
 
   return (
@@ -206,13 +300,13 @@ export default function ShiftCalendar({
         </button>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto mb-8">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-gray-100">
-              <th className="border p-2 sticky left-0 bg-gray-100 z-10 min-w-24">項目</th>
+              <th className="border p-2 sticky left-0 bg-gray-100 z-10 min-w-32">号/項目</th>
               {dates.map((date) => (
-                <th key={date} className="border p-1 min-w-16">
+                <th key={date} className="border p-1 min-w-12">
                   {new Date(date).getDate()}
                 </th>
               ))}
@@ -222,6 +316,34 @@ export default function ShiftCalendar({
             </tr>
           </thead>
           <tbody>
+            {/* もろみスケジュール */}
+            {relevantMoromi.map((moromi, index) => {
+              const moromiColor = getMoromiColor(moromi, index);
+              
+              return (
+                <tr key={moromi.jungoId}>
+                  <td className={`border p-2 font-medium sticky left-0 ${moromiColor} z-10`}>
+                    {moromi.jungoId}号 {moromi.brewingCategory}
+                  </td>
+                  {dates.map((date) => {
+  const mark = getProcessMarkForDate(moromi, date);
+  const isActive = getMoromiForDate(date).some(m => m.jungoId === moromi.jungoId);
+  return (
+    <td 
+      key={date} 
+      className={`border p-1 text-center ${isActive ? moromiColor : ''}`}
+    >
+      {mark}
+    </td>
+  );
+})}
+                  <td colSpan={3} className="border"></td>
+                </tr>
+              );
+            })}
+
+            <tr><td colSpan={dates.length + 4} className="border-t-4 border-gray-400"></td></tr>
+
             {/* メモ行 */}
             <tr className="bg-pink-50">
               <td className="border p-2 font-medium sticky left-0 bg-pink-50 z-10">メモ</td>
@@ -268,22 +390,28 @@ export default function ShiftCalendar({
             {/* 打ち込み */}
             <tr>
               <td className="border p-2 font-medium sticky left-0 bg-white z-10">打ち込み</td>
-              {dates.map((date) => (
-                <td key={date} className="border p-1 text-center">
-                  {getMoromiWork(date) === '打' ? '打' : ''}
-                </td>
-              ))}
+              {dates.map((date) => {
+                const moromi = moromiData.find(m => m.uchikomiDate.includes(date.substring(5)));
+                return (
+                  <td key={date} className="border p-1 text-center">
+                    {moromi ? '打' : ''}
+                  </td>
+                );
+              })}
               <td colSpan={3} className="border"></td>
             </tr>
 
             {/* 上槽 */}
             <tr>
               <td className="border p-2 font-medium sticky left-0 bg-white z-10">上槽</td>
-              {dates.map((date) => (
-                <td key={date} className="border p-1 text-center">
-                  {getMoromiWork(date) === '上' ? '上' : ''}
-                </td>
-              ))}
+              {dates.map((date) => {
+                const moromi = moromiData.find(m => m.josoDate.includes(date.substring(5)));
+                return (
+                  <td key={date} className="border p-1 text-center">
+                    {moromi ? '上' : ''}
+                  </td>
+                );
+              })}
               <td colSpan={3} className="border"></td>
             </tr>
 
@@ -374,7 +502,7 @@ export default function ShiftCalendar({
               const monthShifts = dates.map(date => getShift(staff.id, date));
               const totalHours = monthShifts.reduce((sum, s) => sum + (s?.workHours || 0), 0);
               const restDays = monthShifts.filter(s => s?.workHours === null).length;
-              const settings = monthlySettings.find(ms => ms.staffId === staff.id);
+              const standardHours = getStandardHours(staff.id);
 
               return (
                 <tr key={staff.id}>
@@ -420,13 +548,213 @@ export default function ShiftCalendar({
                     );
                   })}
                   <td className="border p-2 text-center">{totalHours}</td>
-                  <td className="border p-2 text-center">{settings?.standardWorkHours || 208}</td>
+                  <td className="border p-2">
+                    <input
+                      type="number"
+                      className="w-full text-center text-xs"
+                      value={standardHours}
+                      onChange={(e) => {
+                        setLocalStandardHours({
+                          ...localStandardHours,
+                          [staff.id]: parseInt(e.target.value) || 208
+                        });
+                      }}
+                    />
+                  </td>
                   <td className="border p-2 text-center">{restDays}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* スタッフ管理セクション */}
+      <StaffManagementSection staffList={staffList} saveStaff={saveStaff} deleteStaff={deleteStaff} />
+    </div>
+  );
+}
+
+interface StaffManagementSectionProps {
+  staffList: Staff[];
+  saveStaff: (staff: Omit<Staff, 'createdAt' | 'updatedAt'>) => Promise<void>;
+  deleteStaff: (staffId: string) => Promise<void>;
+}
+
+function StaffManagementSection({ staffList, saveStaff, deleteStaff }: StaffManagementSectionProps) {
+  const [newStaffName, setNewStaffName] = useState('');
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  const [editName, setEditName] = useState('');
+
+  const handleAddStaff = async () => {
+    if (!newStaffName.trim()) {
+      alert('スタッフ名を入力してください');
+      return;
+    }
+
+    const newStaff = {
+      id: `staff-${Date.now()}`,
+      name: newStaffName.trim(),
+      displayOrder: staffList.length + 1,
+      isActive: true,
+    };
+
+    await saveStaff(newStaff);
+    setNewStaffName('');
+  };
+
+  const handleEdit = (staff: Staff) => {
+    setEditingStaff(staff);
+    setEditName(staff.name);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingStaff || !editName.trim()) return;
+
+    await saveStaff({
+      ...editingStaff,
+      name: editName.trim(),
+    });
+
+    setEditingStaff(null);
+    setEditName('');
+  };
+
+  const handleToggleActive = async (staff: Staff) => {
+    await saveStaff({
+      ...staff,
+      isActive: !staff.isActive,
+    });
+  };
+
+  const handleDelete = async (staffId: string) => {
+    if (!confirm('このスタッフを削除しますか？')) return;
+    await deleteStaff(staffId);
+  };
+
+  const moveStaff = async (staff: Staff, direction: 'up' | 'down') => {
+    const sortedStaff = [...staffList].sort((a, b) => a.displayOrder - b.displayOrder);
+    const currentIndex = sortedStaff.findIndex(s => s.id === staff.id);
+    
+    if (direction === 'up' && currentIndex === 0) return;
+    if (direction === 'down' && currentIndex === sortedStaff.length - 1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const targetStaff = sortedStaff[targetIndex];
+
+    await saveStaff({
+      ...staff,
+      displayOrder: targetStaff.displayOrder,
+    });
+
+    await saveStaff({
+      ...targetStaff,
+      displayOrder: staff.displayOrder,
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-xl font-bold mb-6">スタッフ管理</h3>
+
+      <div className="mb-6 flex gap-2">
+        <input
+          type="text"
+          value={newStaffName}
+          onChange={(e) => setNewStaffName(e.target.value)}
+          placeholder="新しいスタッフ名"
+          className="flex-1 px-4 py-2 border rounded"
+          onKeyPress={(e) => e.key === 'Enter' && handleAddStaff()}
+        />
+        <button
+          onClick={handleAddStaff}
+          className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          追加
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {[...staffList]
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((staff) => (
+            <div
+              key={staff.id}
+              className={`flex items-center gap-4 p-4 border rounded ${
+                staff.isActive ? 'bg-white' : 'bg-gray-100'
+              }`}
+            >
+              <div className="flex gap-2">
+                <button
+                  onClick={() => moveStaff(staff, 'up')}
+                  className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded"
+                >
+                  ↑
+                </button>
+                <button
+                  onClick={() => moveStaff(staff, 'down')}
+                  className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded"
+                >
+                  ↓
+                </button>
+              </div>
+
+              {editingStaff?.id === staff.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 px-3 py-2 border rounded"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSaveEdit}
+                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                  >
+                    保存
+                  </button>
+                  <button
+                    onClick={() => setEditingStaff(null)}
+                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  >
+                    キャンセル
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex-1 font-medium">
+                    {staff.name}
+                    {!staff.isActive && (
+                      <span className="ml-2 text-sm text-gray-500">(無効)</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleEdit(staff)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    編集
+                  </button>
+                  <button
+                    onClick={() => handleToggleActive(staff)}
+                    className={`px-4 py-2 rounded ${
+                      staff.isActive
+                        ? 'bg-yellow-500 hover:bg-yellow-600'
+                        : 'bg-green-500 hover:bg-green-600'
+                    } text-white`}
+                  >
+                    {staff.isActive ? '無効化' : '有効化'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(staff.id)}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    削除
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
       </div>
     </div>
   );

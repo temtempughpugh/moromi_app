@@ -22,7 +22,7 @@ export function useData() {
   const [availableBYs, setAvailableBYs] = useState<number[]>([]);
   const [currentBY, setCurrentBY] = useState<number>(2025);
   const [moromiData, setMoromiData] = useState<MoromiData[]>([]);
-  const [moromiProcesses, _setMoromiProcesses] = useState<MoromiProcess[]>([]);
+ const [moromiProcesses, setMoromiProcesses] = useState<MoromiProcess[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [monthlySettings, setMonthlySettings] = useState<MonthlySettings[]>([]);
@@ -79,18 +79,27 @@ export function useData() {
   };
 
   const loadMoromiByBY = async (by: number) => {
-    try {
-      console.log('===== loadMoromiByBY 開始 =====');
-      console.log('取得するBY:', by);
-      const data = await getMoromiByBY(by);
-      console.log('取得したデータ数:', data.length);
-      setMoromiData(data);
-      console.log('setMoromiData 完了');
-      console.log('===== loadMoromiByBY 終了 =====');
-    } catch (error) {
-      console.error('もろみデータ取得エラー:', error);
+  try {
+    console.log('===== loadMoromiByBY 開始 =====');
+    console.log('取得するBY:', by);
+    const data = await getMoromiByBY(by);
+    console.log('取得したデータ数:', data.length);
+    setMoromiData(data);
+    
+    // 全もろみの工程データを取得
+    const allProcesses: MoromiProcess[] = [];
+    for (const moromi of data) {
+      const processes = await getProcessesByMoromi(by, moromi.jungoId);
+      allProcesses.push(...processes);
     }
-  };
+    console.log('取得した工程データ数:', allProcesses.length);
+    setMoromiProcesses(allProcesses);
+    
+    console.log('===== loadMoromiByBY 終了 =====');
+  } catch (error) {
+    console.error('もろみデータ取得エラー:', error);
+  }
+};
 
   const importFromLocalCSV = async () => {
     try {
