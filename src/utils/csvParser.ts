@@ -9,13 +9,19 @@ console.warn = (...args: any[]) => {
 
 // Excelシリアル値を日付に変換
 export function excelSerialToDate(serial: number): Date {
-  const excelEpoch = new Date(1899, 11, 30);
-  return new Date(excelEpoch.getTime() + serial * 24 * 60 * 60 * 1000);
+  const excelEpoch = new Date(1899, 11, 30); // ローカル時間で作成
+  const result = new Date(excelEpoch);
+  result.setDate(result.getDate() + serial);
+  result.setHours(0, 0, 0, 0);
+  return result;
 }
 
 // 日付をYYYY-MM-DD形式に変換
 export function dateToString(date: Date): string {
-  return date.toISOString().substring(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // BY（醸造年度）を計算

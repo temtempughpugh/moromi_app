@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 
 interface ShiftCalendarProps {
@@ -36,14 +36,17 @@ export default function ShiftCalendar({
   saveStaff,
   deleteStaff,
 }: ShiftCalendarProps) {
-  const [localShifts, setLocalShifts] = useState<Record<string, Shift>>({});
-  const [localMemos, setLocalMemos] = useState<string[]>([]);
-  const [localRiceDeliveries, setLocalRiceDeliveries] = useState<('◯' | '⚫️' | '')[]>([]);
-  const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
-  const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
-  const [isSaving, setIsSaving] = useState(false);
-  const [dragStart, setDragStart] = useState<{ staffId: string; date: string } | null>(null);
+const [localShifts, setLocalShifts] = useState<Record<string, Shift>>({});
+const [localMemos, setLocalMemos] = useState<string[]>([]);
+const [localRiceDeliveries, setLocalRiceDeliveries] = useState<('◯' | '⚫️' | '')[]>([]);
+const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
+const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
+const [isSaving, setIsSaving] = useState(false);
+const [dragStart, setDragStart] = useState<{ staffId: string; date: string } | null>(null);
 const [dragValue, setDragValue] = useState<string | null>(null);
+const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+const [dragBuffer, setDragBuffer] = useState<Record<string, Shift>>({});
+const dragBufferRef = useRef<Record<string, Shift>>({});
 
   const generateDates = () => {
     const dates: string[] = [];
@@ -82,15 +85,22 @@ const [dragValue, setDragValue] = useState<string | null>(null);
   const monthEnd = new Date(year, month, 5);
 
   return moromiData.filter(m => {
-    // モト掛の日付を取得
     const processes = moromiProcesses.filter(p => p.jungoId === m.jungoId);
     const motoKake = processes.find(p => p.processType === 'motoKake');
+    const soeKake = processes.find(p => p.processType === 'soeKake');
     
-    if (!motoKake || !motoKake.kakeShikomiDate) return false;
+    // モト掛がある場合はモト掛の日付、ない場合は初掛の日付を開始日とする
+    let startDate: Date;
+    if (motoKake && motoKake.kakeShikomiDate) {
+      startDate = new Date(motoKake.kakeShikomiDate);
+    } else if (soeKake && soeKake.kakeShikomiDate) {
+      startDate = new Date(soeKake.kakeShikomiDate);
+    } else {
+      return false;
+    }
     
-    const motoDate = new Date(motoKake.kakeShikomiDate);
     const josoDate = new Date(m.josoDate);
-    return (motoDate <= monthEnd && josoDate >= monthStart);
+    return (startDate <= monthEnd && josoDate >= monthStart);
   }).sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId));
 };
 
@@ -120,18 +130,26 @@ const [dragValue, setDragValue] = useState<string | null>(null);
   };
 
   const getMoromiForDate = (date: string) => {
-    return relevantMoromi.filter(m => {
-      const processes = moromiProcesses.filter(p => p.jungoId === m.jungoId);
-      const motoKake = processes.find(p => p.processType === 'motoKake');
-      
-      if (!motoKake || !motoKake.kakeShikomiDate) return false;
-      
-      const startDate = new Date(motoKake.kakeShikomiDate);
-      const endDate = new Date(m.josoDate);
-      const currentDate = new Date(date);
-      return currentDate >= startDate && currentDate <= endDate;
-    });
-  };
+  return relevantMoromi.filter(m => {
+    const processes = moromiProcesses.filter(p => p.jungoId === m.jungoId);
+    const motoKake = processes.find(p => p.processType === 'motoKake');
+    const soeKake = processes.find(p => p.processType === 'soeKake');
+    
+    // モト掛がある場合はモト掛の日付、ない場合は初掛の日付を開始日とする
+    let startDate: Date;
+    if (motoKake && motoKake.kakeShikomiDate) {
+      startDate = new Date(motoKake.kakeShikomiDate);
+    } else if (soeKake && soeKake.kakeShikomiDate) {
+      startDate = new Date(soeKake.kakeShikomiDate);
+    } else {
+      return false;
+    }
+    
+    const endDate = new Date(m.josoDate);
+    const currentDate = new Date(date);
+    return currentDate >= startDate && currentDate <= endDate;
+  });
+};
 
   const getProcessMarkForDate = (moromi: MoromiData, date: string): string => {
     const processes = moromiProcesses.filter(p => p.jungoId === moromi.jungoId);
@@ -165,53 +183,79 @@ const [dragValue, setDragValue] = useState<string | null>(null);
   };
 
   const getShift = (staffId: string, date: string): Shift | null => {
-    const key = `${staffId}-${date}`;
-    return localShifts[key] || shifts.find(s => s.staffId === staffId && s.date === date) || null;
-  };
+  const key = `${staffId}-${date}`;
+  return dragBuffer[key] || localShifts[key] || shifts.find(s => s.staffId === staffId && s.date === date) || null;
+};
 
   const handleShiftChange = (staffId: string, date: string, value: string) => {
-    const key = `${staffId}-${date}`;
-    
-    if (value === '') {
-      const newLocalShifts = { ...localShifts };
-      delete newLocalShifts[key];
-      setLocalShifts(newLocalShifts);
-      return;
-    }
+  const key = `${staffId}-${date}`;
+  
+  if (value === '') {
+    setLocalShifts(prev => {
+      const newShifts = { ...prev };
+      delete newShifts[key];
+      return newShifts;
+    });
+    return;
+  }
 
     const [shiftType, workHoursStr] = value.split('-');
-    const workHours = workHoursStr === 'rest' ? null : parseFloat(workHoursStr);
+  const workHours = workHoursStr === 'rest' ? null : parseFloat(workHoursStr);
 
-    const shift: Shift = {
-      id: key,
-      date,
-      staffId,
-      shiftType: shiftType as 'normal' | 'early',
-      workHours: workHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
-      memo: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setLocalShifts({ ...localShifts, [key]: shift });
+  const shift: Shift = {
+    id: key,
+    date,
+    staffId,
+    shiftType: shiftType as 'normal' | 'early',
+    workHours: workHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
+    memo: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
+
+  setLocalShifts(prev => ({ ...prev, [key]: shift }));
+};
 
 const handleMouseDown = (staffId: string, date: string, value: string) => {
-    if (value === '') return;
-    setDragStart({ staffId, date });
-    setDragValue(value);
+  if (value === '') return;
+  setDragStart({ staffId, date });
+  setDragValue(value);
+  setDragBuffer({});
+  dragBufferRef.current = {};
+};
+
+const handleMouseEnter = (staffId: string, date: string) => {
+  if (!dragStart || !dragValue) return;
+  if (staffId !== dragStart.staffId) return;
+  
+  const key = `${staffId}-${date}`;
+  const [shiftType, workHoursStr] = dragValue.split('-');
+  const workHours = workHoursStr === 'rest' ? null : parseFloat(workHoursStr);
+
+  const shift: Shift = {
+    id: key,
+    date,
+    staffId,
+    shiftType: shiftType as 'normal' | 'early',
+    workHours: workHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
+    memo: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
-  const handleMouseEnter = (staffId: string, date: string) => {
-    if (!dragStart || !dragValue) return;
-    if (staffId !== dragStart.staffId) return;
-    handleShiftChange(staffId, date, dragValue);
-  };
+  dragBufferRef.current[key] = shift;
+  setDragBuffer({ ...dragBufferRef.current });
+};
 
-  const handleMouseUp = () => {
-    setDragStart(null);
-    setDragValue(null);
-  };
+const handleMouseUp = () => {
+  if (Object.keys(dragBufferRef.current).length > 0) {
+    setLocalShifts(prev => ({ ...prev, ...dragBufferRef.current }));
+  }
+  setDragStart(null);
+  setDragValue(null);
+  setDragBuffer({});
+  dragBufferRef.current = {};
+};
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -299,7 +343,7 @@ const handleMouseDown = (staffId: string, date: string, value: string) => {
   };
 
   return (
-    <div className="p-6" onMouseUp={handleMouseUp}>
+  <div className="p-6" onMouseUp={handleMouseUp} onClick={() => setOpenDropdown(null)}>
       <div className="mb-4 flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
           <button
@@ -622,75 +666,123 @@ const handleMouseDown = (staffId: string, date: string, value: string) => {
   </tr>
 
   {/* スタッフシフト */}
-  {staffList.filter(s => s.isActive).map(staff => {
-    const monthShifts = dates.map(date => getShift(staff.id, date));
-    const totalHours = monthShifts.reduce((sum, s) => sum + (s?.workHours || 0), 0);
-    const restDays = monthShifts.filter(s => s?.workHours === null).length;
-    const standardHours = getStandardHours(staff.id);
+{staffList.filter(s => s.isActive).map(staff => {
+  const monthShifts = dates.map(date => getShift(staff.id, date));
+  const totalHours = monthShifts.reduce((sum, s) => sum + (s?.workHours || 0), 0);
+  const restDays = monthShifts.filter(s => s?.workHours === null).length;
+  const standardHours = getStandardHours(staff.id);
 
-    return (
-      <tr key={staff.id}>
-        <td className="border p-2 font-medium sticky left-0 bg-white z-10">
-          {staff.name}
-        </td>
-        {dates.map(date => {
-          const shift = getShift(staff.id, date);
-          const value = shift 
-            ? `${shift.shiftType}-${shift.workHours || 'rest'}` 
-            : '';
-          
-          const isEarly = shift?.shiftType === 'early';
-          const isRest = shift?.workHours === null || shift?.workHours === 5.5;
+  const shiftOptions = [
+    { value: '', label: '-', group: '' },
+    { value: 'normal-8.5', label: '8.5', group: '通常' },
+    { value: 'normal-7', label: '7', group: '通常' },
+    { value: 'normal-8', label: '8', group: '通常' },
+    { value: 'normal-9', label: '9', group: '通常' },
+    { value: 'normal-7.5', label: '7.5', group: '通常' },
+    { value: 'normal-5.5', label: '5.5', group: '通常' },
+    { value: 'normal-rest', label: '休', group: '通常' },
+    { value: 'early-8.5', label: '8.5', group: '早出' },
+    { value: 'early-7', label: '7', group: '早出' },
+    { value: 'early-8', label: '8', group: '早出' },
+    { value: 'early-9', label: '9', group: '早出' },
+    { value: 'early-7.5', label: '7.5', group: '早出' },
+    { value: 'early-5.5', label: '5.5', group: '早出' },
+    { value: 'early-rest', label: '休', group: '早出' },
+  ];
 
-          return (
-            <td 
-              key={date} 
-              className={`border p-1 ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
-              onMouseEnter={() => handleMouseEnter(staff.id, date)}
-            >
-              <select
-                className={`w-full text-center border-0 bg-transparent text-[10px] appearance-none ${isRest ? 'text-red-600 font-bold' : ''}`}
-                value={value}
-                onChange={(e) => handleShiftChange(staff.id, date, e.target.value)}
-                onMouseDown={() => handleMouseDown(staff.id, date, value)}
-              >
-                <option value=""></option>
-                <option value="normal-8.5">8.5</option>
-                <option value="normal-7">7</option>
-                <option value="normal-8">8</option>
-                <option value="normal-9">9</option>
-                <option value="normal-7.5">7.5</option>
-                <option value="normal-5.5">5.5</option>
-                <option value="normal-rest">休</option>
-                <option value="early-8.5">早8.5</option>
-                <option value="early-7">早7</option>
-                <option value="early-8">早8</option>
-                <option value="early-9">早9</option>
-                <option value="early-7.5">早7.5</option>
-                <option value="early-5.5">早5.5</option>
-                <option value="early-rest">早休</option>
-              </select>
-            </td>
-          );
-        })}
-        <td className="border p-2 text-center">{totalHours}</td>
-        <td className="border p-2">
-          <input
-            type="number"
-            className="w-full text-center text-[10px]"
-            value={standardHours}
-            onChange={(e) => {
-              setLocalStandardHours({
-                ...localStandardHours,
-                [staff.id]: parseInt(e.target.value) || 208
-              });
+  return (
+    <tr key={staff.id}>
+      <td className="border p-2 font-medium sticky left-0 bg-white z-10">
+        {staff.name}
+      </td>
+      {dates.map(date => {
+        const shift = getShift(staff.id, date);
+        const value = shift 
+          ? `${shift.shiftType}-${shift.workHours || 'rest'}` 
+          : '';
+        
+        const isEarly = shift?.shiftType === 'early';
+        const isRest = shift?.workHours === null || shift?.workHours === 5.5;
+        const cellKey = `${staff.id}-${date}`;
+        const isOpen = openDropdown === cellKey;
+
+        const displayText = value 
+          ? shiftOptions.find(opt => opt.value === value)?.label || ''
+          : '';
+
+        return (
+          <td 
+            key={date} 
+            className={`border p-1 relative ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
+            onMouseDown={(e) => {
+              if (!isOpen) {
+                handleMouseDown(staff.id, date, value);
+              }
             }}
-          />
-        </td>
-        <td className="border p-2 text-center">{restDays}</td>
-      </tr>
-    );
-  })}
+            onMouseEnter={() => handleMouseEnter(staff.id, date)}
+          >
+            <div
+              className={`w-full text-center text-[10px] cursor-pointer select-none ${isRest ? 'text-red-600 font-bold' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenDropdown(isOpen ? null : cellKey);
+              }}
+            >
+              {isEarly && displayText && displayText !== '休' && '早'}
+              {displayText}
+            </div>
+
+            {isOpen && (
+              <div 
+                className="absolute top-full left-0 bg-white border border-gray-300 shadow-lg z-50 min-w-[80px]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {['', '通常', '早出'].map(group => (
+                  <div key={group}>
+                    {group && (
+                      <div className="bg-gray-100 px-2 py-1 text-[10px] font-bold border-b">
+                        {group}
+                      </div>
+                    )}
+                    {shiftOptions
+                      .filter(opt => opt.group === group)
+                      .map(option => (
+                        <div
+                          key={option.value}
+                          className="px-2 py-1 text-[10px] hover:bg-blue-100 cursor-pointer"
+                          onClick={() => {
+                            handleShiftChange(staff.id, date, option.value);
+                            setOpenDropdown(null);
+                          }}
+                        >
+                          {option.label}
+                        </div>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </td>
+        );
+      })}
+      <td className="border p-2 text-center">{totalHours}</td>
+      <td className="border p-2">
+        <input
+          type="number"
+          className="w-full text-center text-[10px]"
+          value={standardHours}
+          onChange={(e) => {
+            setLocalStandardHours({
+              ...localStandardHours,
+              [staff.id]: parseInt(e.target.value) || 208
+            });
+          }}
+        />
+      </td>
+      <td className="border p-2 text-center">{restDays}</td>
+    </tr>
+  );
+})}
 </tbody>
         </table>
       </div>
