@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 
 const SHIFT_OPTIONS = [
@@ -66,7 +66,6 @@ const [isSaving, setIsSaving] = useState(false);
 const [dragStart, setDragStart] = useState<{ staffId: string; date: string } | null>(null);
 const [dragValue, setDragValue] = useState<string | null>(null);
 const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-const [dragBuffer, setDragBuffer] = useState<Record<string, Shift>>({});
 const dragBufferRef = useRef<Record<string, Shift>>({});
 
 // ↓ これを追加
@@ -97,6 +96,8 @@ const shiftsMap = useMemo(() => {
   };
 
   const dates = generateDates();
+
+  
 
   const colors = [
     'bg-red-200',
@@ -214,7 +215,7 @@ const shiftsMap = useMemo(() => {
 
   const getShift = (staffId: string, date: string): Shift | null => {
   const key = `${staffId}-${date}`;
-  return dragBufferRef.current[key] || localShifts[key] || shiftsMap.get(key) || null;
+  return localShifts[key] || shiftsMap.get(key) || null;
 };
 
   const handleShiftChange = (staffId: string, date: string, value: string) => {
