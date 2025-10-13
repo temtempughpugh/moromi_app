@@ -9,7 +9,35 @@
     color-adjust: exact !important;
   }
   
+  @page {
+    size: A3 landscape;
+    margin: 0;
+  }
+  
   .no-print {
     display: none !important;
+  }
+  
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: scale(0.95);
+    transform-origin: top left;
+    width: 105%;
+  }
+  
+  table {
+    width: 100% !important;
+    font-size: 5pt !important;
+    table-layout: fixed !important;
+  }
+  
+  th:first-child, td:first-child {
+    width: 12% !important;
+  }
+  
+  th, td {
+    padding: 0.5mm !important;
+    line-height: 1.1 !important;
   }
 }

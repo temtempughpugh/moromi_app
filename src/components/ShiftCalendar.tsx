@@ -77,16 +77,22 @@ const [dragValue, setDragValue] = useState<string | null>(null);
   ];
 
   const getRelevantMoromi = () => {
-    const [year, month] = currentShiftMonth.split('-').map(Number);
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 5);
+  const [year, month] = currentShiftMonth.split('-').map(Number);
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 5);
 
-    return moromiData.filter(m => {
-      const tomeDate = new Date(m.tomeDate);
-      const josoDate = new Date(m.josoDate);
-      return (tomeDate <= monthEnd && josoDate >= monthStart);
-    }).sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId));
-  };
+  return moromiData.filter(m => {
+    // モト掛の日付を取得
+    const processes = moromiProcesses.filter(p => p.jungoId === m.jungoId);
+    const motoKake = processes.find(p => p.processType === 'motoKake');
+    
+    if (!motoKake || !motoKake.kakeShikomiDate) return false;
+    
+    const motoDate = new Date(motoKake.kakeShikomiDate);
+    const josoDate = new Date(m.josoDate);
+    return (motoDate <= monthEnd && josoDate >= monthStart);
+  }).sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId));
+};
 
   const relevantMoromi = getRelevantMoromi();
 
@@ -312,11 +318,86 @@ const handleMouseDown = (staffId: string, date: string, value: string) => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => window.print()}
-            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            印刷
-          </button>
+  onClick={() => {
+    const printWindow = window.open('', '_blank');
+    const table = document.querySelector('.overflow-x-auto table');
+    const clonedTable = table?.cloneNode(true) as HTMLTableElement;
+    
+    // すべてのselect要素を選択されたテキストに置き換え
+    clonedTable?.querySelectorAll('select').forEach(select => {
+      const selectedText = select.options[select.selectedIndex]?.text || '';
+      const span = document.createElement('span');
+      span.textContent = selectedText;
+      select.replaceWith(span);
+    });
+    
+    // すべてのinput要素を値に置き換え
+    clonedTable?.querySelectorAll('input').forEach(input => {
+      const span = document.createElement('span');
+      span.textContent = input.value || '';
+      input.replaceWith(span);
+    });
+    
+    printWindow?.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          @page { size: A3 landscape; margin: 5mm; }
+          * { 
+            print-color-adjust: exact !important; 
+            -webkit-print-color-adjust: exact !important; 
+            box-sizing: border-box;
+          }
+          body { 
+            margin: 0; 
+            padding: 5mm; 
+            font-family: sans-serif; 
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 6pt;
+            table-layout: fixed;
+          }
+          th, td { 
+            border: 0.5px solid #666; 
+            padding: 1mm; 
+            text-align: center;
+            line-height: 1.2;
+            overflow: hidden;
+          }
+          th:first-child, td:first-child { 
+            width: 12%; 
+            font-size: 5pt;
+          }
+          .bg-red-200 { background-color: #fecaca !important; }
+          .bg-blue-200 { background-color: #bfdbfe !important; }
+          .bg-green-200 { background-color: #bbf7d0 !important; }
+          .bg-yellow-200 { background-color: #fef08a !important; }
+          .bg-purple-200 { background-color: #e9d5ff !important; }
+          .bg-pink-200 { background-color: #fbcfe8 !important; }
+          .bg-orange-200 { background-color: #fed7aa !important; }
+          .bg-teal-200 { background-color: #99f6e4 !important; }
+          .bg-pink-50 { background-color: #fdf2f8 !important; }
+          .bg-yellow-50 { background-color: #fefce8 !important; }
+          .bg-green-50 { background-color: #f0fdf4 !important; }
+          .bg-blue-100 { background-color: #dbeafe !important; }
+          .bg-gray-100 { background-color: #f3f4f6 !important; }
+        </style>
+      </head>
+      <body onload="window.print(); window.close();">
+        ${clonedTable?.outerHTML || ''}
+      </body>
+      </html>
+    `);
+    printWindow?.document.close();
+  }}
+  className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+>
+  印刷
+</button>
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -333,268 +414,284 @@ const handleMouseDown = (staffId: string, date: string, value: string) => {
             <tr className="bg-gray-100">
               <th className="border p-1 sticky left-0 bg-gray-100 z-10 w-20">号/項目</th>
               {dates.map((date) => (
-                <th key={date} className="border p-0.5 w-8">
-                  {new Date(date).getDate()}
-                </th>
+                <th key={date} className={`border p-0.5 w-8 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+  {new Date(date).getDate()}
+</th>
               ))}
-<th className="border p-1 w-12">合計</th>
-<th className="border p-1 w-12">所定</th>
-<th className="border p-1 w-12">休日</th>
+<th className="border p-1 w-12"></th>
+<th className="border p-1 w-12"></th>
+<th className="border p-1 w-12"></th>
             </tr>
           </thead>
           <tbody>
-            {/* もろみスケジュール */}
-            {relevantMoromi.map((moromi, index) => {
-              const moromiColor = getMoromiColor(moromi, index);
-              
-              return (
-                <tr key={moromi.jungoId}>
-                  <td className={`border p-1 font-medium sticky left-0 ${moromiColor} z-10 text-[10px]`}>
-  {moromi.jungoId}号 {moromi.tankNo}タンク {moromi.brewingCategory}
-                  </td>
-                  {dates.map((date) => {
-  const mark = getProcessMarkForDate(moromi, date);
-  const isActive = getMoromiForDate(date).some(m => m.jungoId === moromi.jungoId);
-  return (
-    <td 
-      key={date} 
-      className={`border p-1 text-center ${isActive ? moromiColor : ''}`}
-    >
-      {mark}
-    </td>
-  );
-})}
-                  <td colSpan={3} className="border"></td>
-                </tr>
-              );
-            })}
+  {/* もろみスケジュール */}
+  {relevantMoromi.map((moromi, index) => {
+    const moromiColor = getMoromiColor(moromi, index);
+    
+    return (
+      <tr key={moromi.jungoId}>
+        <td className={`border p-1 font-medium sticky left-0 ${moromiColor} z-10 text-[10px]`}>
+          {moromi.jungoId}号 {moromi.tankNo}タンク {moromi.brewingCategory}
+        </td>
+        {dates.map((date) => {
+          const mark = getProcessMarkForDate(moromi, date);
+          const isActive = getMoromiForDate(date).some(m => m.jungoId === moromi.jungoId);
+          return (
+            <td 
+              key={date} 
+              className={`border p-1 text-center ${isActive ? moromiColor : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
+            >
+              {mark}
+            </td>
+          );
+        })}
+        <td colSpan={3} className="border"></td>
+      </tr>
+    );
+  })}
 
-            <tr><td colSpan={dates.length + 4} className="border-t-4 border-gray-400"></td></tr>
+  <tr><td colSpan={dates.length + 4} className="border-t-4 border-gray-400"></td></tr>
 
-            {/* メモ行 */}
-            <tr className="bg-pink-50">
-              <td className="border p-2 font-medium sticky left-0 bg-pink-50 z-10">メモ</td>
-              {dates.map((date, i) => (
-                <td key={date} className="border p-1">
-                  <input
-  type="text"
-  className="w-full text-center bg-transparent text-[10px]"
-                    value={localMemos[i] || memoRow?.memos[i] || ''}
-                    onChange={(e) => {
-                      const newMemos = [...(memoRow?.memos || Array(dates.length).fill(''))];
-                      newMemos[i] = e.target.value;
-                      setLocalMemos(newMemos);
-                    }}
-                  />
-                </td>
-              ))}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* メモ行 */}
+  <tr className="bg-pink-50">
+    <td className="border p-2 font-medium sticky left-0 bg-pink-50 z-10">メモ</td>
+    {dates.map((date, i) => (
+      <td key={date} className={`border p-1 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        <input
+          type="text"
+          className="w-full text-center bg-transparent text-[10px]"
+          value={localMemos[i] || memoRow?.memos[i] || ''}
+          onChange={(e) => {
+            const newMemos = [...(memoRow?.memos || Array(dates.length).fill(''))];
+            newMemos[i] = e.target.value;
+            setLocalMemos(newMemos);
+          }}
+        />
+      </td>
+    ))}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 米入荷 */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">米入荷</td>
-              {dates.map((date, i) => (
-                <td key={date} className="border p-1">
-                  <select
-  className="w-full text-center bg-transparent text-[10px] appearance-none"
-                    value={localRiceDeliveries[i] || riceDelivery?.deliveries[i] || ''}
-                    onChange={(e) => {
-                      const newDeliveries = [...(riceDelivery?.deliveries || Array(dates.length).fill(''))];
-                      newDeliveries[i] = e.target.value as '◯' | '⚫️' | '';
-                      setLocalRiceDeliveries(newDeliveries);
-                    }}
-                  >
-                    <option value="">-</option>
-                    <option value="◯">◯</option>
-                    <option value="⚫️">●</option>
-                  </select>
-                </td>
-              ))}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 米入荷 */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">米入荷</td>
+    {dates.map((date, i) => (
+      <td key={date} className={`border p-1 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        <select
+          className="w-full text-center bg-transparent text-[10px] appearance-none"
+          value={localRiceDeliveries[i] || riceDelivery?.deliveries[i] || ''}
+          onChange={(e) => {
+            const newDeliveries = [...(riceDelivery?.deliveries || Array(dates.length).fill(''))];
+            newDeliveries[i] = e.target.value as '◯' | '⚫️' | '';
+            setLocalRiceDeliveries(newDeliveries);
+          }}
+        >
+          <option value=""></option>
+          <option value="◯">◯</option>
+          <option value="⚫️">●</option>
+        </select>
+      </td>
+    ))}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 打ち込み */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">打ち込み</td>
-              {dates.map((date) => {
-                const moromi = moromiData.find(m => m.uchikomiDate.includes(date.substring(5)));
-                return (
-                  <td key={date} className="border p-1 text-center">
-                    {moromi ? '打' : ''}
-                  </td>
-                );
-              })}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 打ち込み */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">打ち込み</td>
+    {dates.map((date) => {
+      const moromi = moromiData.find(m => m.uchikomiDate.includes(date.substring(5)));
+      return (
+        <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+          {moromi ? '打' : ''}
+        </td>
+      );
+    })}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 上槽 */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">上槽</td>
-              {dates.map((date) => {
-                const moromi = moromiData.find(m => m.josoDate.includes(date.substring(5)));
-                return (
-                  <td key={date} className="border p-1 text-center">
-                    {moromi ? '上' : ''}
-                  </td>
-                );
-              })}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 上槽 */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">上槽</td>
+    {dates.map((date) => {
+      const moromi = moromiData.find(m => m.josoDate.includes(date.substring(5)));
+      return (
+        <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+          {moromi ? '上' : ''}
+        </td>
+      );
+    })}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 麹量 */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">麹量</td>
-              {dates.map((date) => {
-                const amount = getKojiAmount(date);
-                return (
-                  <td key={date} className="border p-1 text-center">
-                    {amount > 0 ? amount : ''}
-                  </td>
-                );
-              })}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 麹量 */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">麹量</td>
+    {dates.map((date) => {
+      const amount = getKojiAmount(date);
+      return (
+        <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+          {amount > 0 ? amount : ''}
+        </td>
+      );
+    })}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 蒸し */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">蒸し</td>
-              {dates.map((date) => (
-                <td key={date} className="border p-1 text-center">
-                  {getSteaming(date)}
-                </td>
-              ))}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 蒸し */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">蒸し</td>
+    {dates.map((date) => (
+      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {getSteaming(date)}
+      </td>
+    ))}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 盛り */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">盛り</td>
-              {dates.map((date) => (
-                <td key={date} className="border p-1 text-center">
-                  {getMori(date)}
-                </td>
-              ))}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 盛り */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">盛り</td>
+    {dates.map((date) => (
+      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {getMori(date)}
+      </td>
+    ))}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* 出麹 */}
-            <tr>
-              <td className="border p-2 font-medium sticky left-0 bg-white z-10">出麹</td>
-              {dates.map((date) => (
-                <td key={date} className="border p-1 text-center">
-                  {getDekoji(date)}
-                </td>
-              ))}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 出麹 */}
+  <tr>
+    <td className="border p-2 font-medium sticky left-0 bg-white z-10">出麹</td>
+    {dates.map((date) => (
+      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {getDekoji(date)}
+      </td>
+    ))}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-            {/* Minimum */}
-            <tr className="bg-yellow-50">
-              <td className="border p-2 font-medium sticky left-0 bg-yellow-50 z-10">Minimum</td>
-              {dates.map((date, i) => (
-                <td key={date} className="border p-1">
-                  <input
-  type="number"
-  className="w-full text-center bg-transparent text-[10px]"
-                    value={localMinimumStaff[i] || 3}
-                    onChange={(e) => {
-                      const newMinimum = [...localMinimumStaff];
-                      newMinimum[i] = parseInt(e.target.value) || 3;
-                      setLocalMinimumStaff(newMinimum);
-                    }}
-                  />
-                </td>
-              ))}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* 空白行 */}
+  <tr><td colSpan={dates.length + 4} className="border-t-4 border-gray-400"></td></tr>
 
-            {/* Surplus */}
-            <tr className="bg-green-50">
-              <td className="border p-2 font-medium sticky left-0 bg-green-50 z-10">Surplus</td>
-              {dates.map((date, i) => {
-                const minimum = localMinimumStaff[i] || 3;
-                const surplus = getSurplus(date, minimum);
-                return (
-                  <td key={date} className="border p-1 text-center">
-                    {surplus}
-                  </td>
-                );
-              })}
-              <td colSpan={3} className="border"></td>
-            </tr>
+  {/* ヘッダー行 */}
+  <tr className="bg-gray-100">
+    <th className="border p-1 sticky left-0 bg-gray-100 z-10">号/項目</th>
+    {dates.map((date) => (
+      <th key={date} className={`border p-0.5 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {new Date(date).getDate()}
+      </th>
+    ))}
+    <th className="border p-1">合計</th>
+    <th className="border p-1">所定</th>
+    <th className="border p-1">休日</th>
+  </tr>
 
-            {/* スタッフシフト */}
-            {staffList.filter(s => s.isActive).map(staff => {
-              const monthShifts = dates.map(date => getShift(staff.id, date));
-              const totalHours = monthShifts.reduce((sum, s) => sum + (s?.workHours || 0), 0);
-              const restDays = monthShifts.filter(s => s?.workHours === null).length;
-              const standardHours = getStandardHours(staff.id);
+  {/* Minimum */}
+  <tr className="bg-yellow-50">
+    <td className="border p-2 font-medium sticky left-0 bg-yellow-50 z-10">Minimum</td>
+    {dates.map((date, i) => (
+      <td key={date} className={`border p-1 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        <input
+          type="number"
+          className="w-full text-center bg-transparent text-[10px]"
+          value={localMinimumStaff[i] || 3}
+          onChange={(e) => {
+            const newMinimum = [...localMinimumStaff];
+            newMinimum[i] = parseInt(e.target.value) || 3;
+            setLocalMinimumStaff(newMinimum);
+          }}
+        />
+      </td>
+    ))}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-              return (
-                <tr key={staff.id}>
-                  <td className="border p-2 font-medium sticky left-0 bg-white z-10">
-                    {staff.name}
-                  </td>
-                  {dates.map(date => {
-                    const shift = getShift(staff.id, date);
-                    const value = shift 
-                      ? `${shift.shiftType}-${shift.workHours || 'rest'}` 
-                      : '';
-                    
-                    const isEarly = shift?.shiftType === 'early';
-                    const isRest = shift?.workHours === null || shift?.workHours === 5.5;
+  {/* Surplus */}
+  <tr className="bg-green-50">
+    <td className="border p-2 font-medium sticky left-0 bg-green-50 z-10">Surplus</td>
+    {dates.map((date, i) => {
+      const minimum = localMinimumStaff[i] || 3;
+      const surplus = getSurplus(date, minimum);
+      return (
+        <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+          {surplus}
+        </td>
+      );
+    })}
+    <td colSpan={3} className="border"></td>
+  </tr>
 
-                    return (
-                      <td 
-                        key={date} 
-                        className={`border p-1 ${isEarly ? 'bg-blue-100' : ''}`}
-                        onMouseEnter={() => handleMouseEnter(staff.id, date)}  // ← この行を追加
-                      >
-                       <select
-  className={`w-full text-center border-0 bg-transparent text-[10px] appearance-none ${isRest ? 'text-red-600 font-bold' : ''}`}
-  value={value}
-  onChange={(e) => handleShiftChange(staff.id, date, e.target.value)}
-  onMouseDown={() => handleMouseDown(staff.id, date, value)}
->
-                          <option value="">-</option>
-                          <option value="normal-8.5">8.5</option>
-                          <option value="normal-7">7</option>
-                          <option value="normal-8">8</option>
-                          <option value="normal-9">9</option>
-                          <option value="normal-7.5">7.5</option>
-                          <option value="normal-5.5">5.5</option>
-                          <option value="normal-rest">休</option>
-                          <option value="early-8.5">早8.5</option>
-                          <option value="early-7">早7</option>
-                          <option value="early-8">早8</option>
-                          <option value="early-9">早9</option>
-                          <option value="early-7.5">早7.5</option>
-                          <option value="early-5.5">早5.5</option>
-                          <option value="early-rest">早休</option>
-                        </select>
-                      </td>
-                    );
-                  })}
-                  <td className="border p-2 text-center">{totalHours}</td>
-                  <td className="border p-2">
-                    <input
-  type="number"
-  className="w-full text-center text-[10px]"
-                      value={standardHours}
-                      onChange={(e) => {
-                        setLocalStandardHours({
-                          ...localStandardHours,
-                          [staff.id]: parseInt(e.target.value) || 208
-                        });
-                      }}
-                    />
-                  </td>
-                  <td className="border p-2 text-center">{restDays}</td>
-                </tr>
-              );
-            })}
-          </tbody>
+  {/* スタッフシフト */}
+  {staffList.filter(s => s.isActive).map(staff => {
+    const monthShifts = dates.map(date => getShift(staff.id, date));
+    const totalHours = monthShifts.reduce((sum, s) => sum + (s?.workHours || 0), 0);
+    const restDays = monthShifts.filter(s => s?.workHours === null).length;
+    const standardHours = getStandardHours(staff.id);
+
+    return (
+      <tr key={staff.id}>
+        <td className="border p-2 font-medium sticky left-0 bg-white z-10">
+          {staff.name}
+        </td>
+        {dates.map(date => {
+          const shift = getShift(staff.id, date);
+          const value = shift 
+            ? `${shift.shiftType}-${shift.workHours || 'rest'}` 
+            : '';
+          
+          const isEarly = shift?.shiftType === 'early';
+          const isRest = shift?.workHours === null || shift?.workHours === 5.5;
+
+          return (
+            <td 
+              key={date} 
+              className={`border p-1 ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
+              onMouseEnter={() => handleMouseEnter(staff.id, date)}
+            >
+              <select
+                className={`w-full text-center border-0 bg-transparent text-[10px] appearance-none ${isRest ? 'text-red-600 font-bold' : ''}`}
+                value={value}
+                onChange={(e) => handleShiftChange(staff.id, date, e.target.value)}
+                onMouseDown={() => handleMouseDown(staff.id, date, value)}
+              >
+                <option value=""></option>
+                <option value="normal-8.5">8.5</option>
+                <option value="normal-7">7</option>
+                <option value="normal-8">8</option>
+                <option value="normal-9">9</option>
+                <option value="normal-7.5">7.5</option>
+                <option value="normal-5.5">5.5</option>
+                <option value="normal-rest">休</option>
+                <option value="early-8.5">早8.5</option>
+                <option value="early-7">早7</option>
+                <option value="early-8">早8</option>
+                <option value="early-9">早9</option>
+                <option value="early-7.5">早7.5</option>
+                <option value="early-5.5">早5.5</option>
+                <option value="early-rest">早休</option>
+              </select>
+            </td>
+          );
+        })}
+        <td className="border p-2 text-center">{totalHours}</td>
+        <td className="border p-2">
+          <input
+            type="number"
+            className="w-full text-center text-[10px]"
+            value={standardHours}
+            onChange={(e) => {
+              setLocalStandardHours({
+                ...localStandardHours,
+                [staff.id]: parseInt(e.target.value) || 208
+              });
+            }}
+          />
+        </td>
+        <td className="border p-2 text-center">{restDays}</td>
+      </tr>
+    );
+  })}
+</tbody>
         </table>
       </div>
 
