@@ -1,23 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
-
-const SHIFT_OPTIONS = [
-  { value: '', label: '-', group: '' },
-  { value: 'normal-8.5', label: '8.5', group: '通常' },
-  { value: 'normal-7', label: '7', group: '通常' },
-  { value: 'normal-8', label: '8', group: '通常' },
-  { value: 'normal-9', label: '9', group: '通常' },
-  { value: 'normal-7.5', label: '7.5', group: '通常' },
-  { value: 'normal-5.5', label: '5.5', group: '通常' },
-  { value: 'normal-rest', label: '休', group: '通常' },
-  { value: 'early-8.5', label: '早8.5', group: '早出' },
-  { value: 'early-7', label: '早7', group: '早出' },
-  { value: 'early-8', label: '早8', group: '早出' },
-  { value: 'early-9', label: '早9', group: '早出' },
-  { value: 'early-7.5', label: '早7.5', group: '早出' },
-  { value: 'early-5.5', label: '早5.5', group: '早出' },
-  { value: 'early-rest', label: '早休', group: '早出' },
-];
 
 
 interface ShiftCalendarProps {
@@ -63,16 +45,18 @@ const [localRiceDeliveries, setLocalRiceDeliveries] = useState<('◯' | '⚫️'
 const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
 const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
 const [isSaving, setIsSaving] = useState(false);
-const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
-// ↓ これを追加
-const shiftsMap = useMemo(() => {
-  const map = new Map<string, Shift>();
+// ここに追加
+useEffect(() => {
+  const shiftsObject: Record<string, Shift> = {};
   shifts.forEach(shift => {
-    map.set(`${shift.staffId}-${shift.date}`, shift);
+    shiftsObject[`${shift.staffId}-${shift.date}`] = shift;
   });
-  return map;
-}, [shifts]);
+  setLocalShifts(shiftsObject);
+}, [currentShiftMonth, shifts]);
+
+// ↓ これを追加 ← このコメントと次のshiftsMapを削除
+
 
   const generateDates = () => {
     const dates: string[] = [];
@@ -212,20 +196,17 @@ const shiftsMap = useMemo(() => {
 
   const getShift = (staffId: string, date: string): Shift | null => {
   const key = `${staffId}-${date}`;
-  return localShifts[key] || shiftsMap.get(key) || null;
+  return localShifts[key] || null;
 };
 
   const handleShiftChange = (staffId: string, date: string, value: string) => {
   const key = `${staffId}-${date}`;
   
   if (value === '') {
-    setLocalShifts(prev => {
-      const newShifts = { ...prev };
-      delete newShifts[key];
-      return newShifts;
-    });
-    return;
-  }
+  // 削除マークを付ける（nullで示す）
+  setLocalShifts(prev => ({ ...prev, [key]: null as any }));
+  return;
+}
 
   const [shiftType, workHoursStr] = value.split('-');
   const workHours = workHoursStr === 'rest' ? null : parseFloat(workHoursStr);
@@ -249,7 +230,7 @@ const shiftsMap = useMemo(() => {
   let prevValue = '';
   for (let i = currentIndex - 1; i >= 0; i--) {
     const prevKey = `${staffId}-${dates[i]}`;
-    const prevShift = localShifts[prevKey] || shiftsMap.get(prevKey);
+    const prevShift = localShifts[prevKey];
     if (prevShift) {
       prevIndex = i;
       prevValue = `${prevShift.shiftType}-${prevShift.workHours || 'rest'}`;
@@ -285,7 +266,8 @@ const shiftsMap = useMemo(() => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await saveShifts(Object.values(localShifts));
+      const shiftsToSave = Object.values(localShifts).filter(s => s !== null);
+await saveShifts(shiftsToSave);
       
       if (localMemos.length > 0) {
         await saveMemoRow({ yearMonth: currentShiftMonth, memos: localMemos });
@@ -305,12 +287,12 @@ const shiftsMap = useMemo(() => {
         await saveMonthlySettings(settings);
       }
       
-      setLocalShifts({});
-      setLocalMemos([]);
-      setLocalRiceDeliveries([]);
-      setLocalStandardHours({});
-      setLocalMinimumStaff([]);
-      alert('保存しました');
+      // localShiftsを空にしない（保存したデータは画面に残す）
+setLocalMemos([]);
+setLocalRiceDeliveries([]);
+setLocalStandardHours({});
+setLocalMinimumStaff([]);
+alert('保存しました');
     } catch (error) {
       console.error('保存エラー:', error);
       alert('保存に失敗しました');
@@ -368,7 +350,7 @@ const shiftsMap = useMemo(() => {
   };
 
   return (
-  <div className="p-6" onClick={() => setOpenDropdown(null)}>
+<div className="p-6">
       <div className="mb-4 flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
           <button
@@ -710,69 +692,37 @@ const shiftsMap = useMemo(() => {
         
         const isEarly = shift?.shiftType === 'early';
         const isRest = shift?.workHours === null || shift?.workHours === 5.5;
-        const cellKey = `${staff.id}-${date}`;
-        const isOpen = openDropdown === cellKey;
-
-        const displayText = value 
-  ? SHIFT_OPTIONS.find(opt => opt.value === value)?.label || ''
-  : '';
-
         return (
   <td 
   key={date} 
-  className={`border p-1 relative select-none ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
+  className={`border p-1 ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
 >
-            <div
-              className={`w-full text-center text-[10px] cursor-pointer select-none ${isRest ? 'text-red-600 font-bold' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpenDropdown(isOpen ? null : cellKey);
-              }}
-            >
-              {isEarly && displayText && displayText !== '休' && '早'}
-              {displayText}
-            </div>
-
-            {isOpen && (
-  <div 
-    className="absolute top-full left-0 bg-white border border-gray-300 shadow-lg z-50 w-[240px] p-2"
-    onClick={(e) => e.stopPropagation()}
+  <select
+    className={`w-full text-center border-0 bg-transparent text-[10px] appearance-none ${isRest ? 'text-red-600 font-bold' : ''}`}
+    value={value}
+    onChange={(e) => handleShiftChange(staff.id, date, e.target.value)}
   >
-    {['通常', '早出'].map(group => (
-      <div key={group} className="mb-2">
-        <div className="text-[10px] font-bold mb-1 text-gray-600">{group}</div>
-        <div className="grid grid-cols-4 gap-1">
-          {SHIFT_OPTIONS
-            .filter(opt => opt.group === group)
-            .map(option => (
-              <div
-                key={option.value}
-                className="px-2 py-1 text-[10px] text-center hover:bg-blue-100 cursor-pointer border border-gray-200 rounded"
-                onClick={() => {
-                  handleShiftChange(staff.id, date, option.value);
-                  setOpenDropdown(null);
-                }}
-              >
-                {option.label}
-              </div>
-            ))}
-        </div>
-      </div>
-    ))}
-    <div className="border-t pt-2">
-      <div
-        className="px-2 py-1 text-[10px] text-center hover:bg-gray-100 cursor-pointer"
-        onClick={() => {
-          handleShiftChange(staff.id, date, '');
-          setOpenDropdown(null);
-        }}
-      >
-        クリア
-      </div>
-    </div>
-  </div>
-)}
-          </td>
+    <option value=""></option>
+    <optgroup label="通常">
+      <option value="normal-8.5">8.5</option>
+      <option value="normal-7">7</option>
+      <option value="normal-8">8</option>
+      <option value="normal-9">9</option>
+      <option value="normal-7.5">7.5</option>
+      <option value="normal-5.5">5.5</option>
+      <option value="normal-rest">休</option>
+    </optgroup>
+    <optgroup label="早出">
+      <option value="early-8.5">{isEarly ? '8.5' : '早8.5'}</option>
+      <option value="early-7">{isEarly ? '7' : '早7'}</option>
+      <option value="early-8">{isEarly ? '8' : '早8'}</option>
+      <option value="early-9">{isEarly ? '9' : '早9'}</option>
+      <option value="early-7.5">{isEarly ? '7.5' : '早7.5'}</option>
+      <option value="early-5.5">{isEarly ? '5.5' : '早5.5'}</option>
+      <option value="early-rest">休</option>
+    </optgroup>
+  </select>
+</td>
         );
       })}
       <td className="border p-2 text-center">{totalHours}</td>
