@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 
 const SHIFT_OPTIONS = [
@@ -63,10 +63,7 @@ const [localRiceDeliveries, setLocalRiceDeliveries] = useState<('◯' | '⚫️'
 const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
 const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
 const [isSaving, setIsSaving] = useState(false);
-const [dragStart, setDragStart] = useState<{ staffId: string; date: string } | null>(null);
-const [dragValue, setDragValue] = useState<string | null>(null);
 const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-const dragBufferRef = useRef<Record<string, Shift>>({});
 
 // ↓ これを追加
 const shiftsMap = useMemo(() => {
@@ -230,7 +227,7 @@ const shiftsMap = useMemo(() => {
     return;
   }
 
-    const [shiftType, workHoursStr] = value.split('-');
+  const [shiftType, workHoursStr] = value.split('-');
   const workHours = workHoursStr === 'rest' ? null : parseFloat(workHoursStr);
 
   const shift: Shift = {
@@ -244,48 +241,47 @@ const shiftsMap = useMemo(() => {
     updatedAt: new Date().toISOString(),
   };
 
-  setLocalShifts(prev => ({ ...prev, [key]: shift }));
-};
-
-const handleMouseDown = (staffId: string, date: string, value: string) => {
-  // if (value === '') return; ← この行を削除
-  setDragStart({ staffId, date });
-  setDragValue(value);
-  dragBufferRef.current = {};
-};
-
-const handleMouseEnter = (staffId: string, date: string) => {
-  if (!dragStart || !dragValue) return;
-  if (staffId !== dragStart.staffId) return;
+  // 現在の日付のインデックスを取得
+  const currentIndex = dates.findIndex(d => d === date);
   
-  const key = `${staffId}-${date}`;
-  const [shiftType, workHoursStr] = dragValue.split('-');
-  const workHours = workHoursStr === 'rest' ? null : parseFloat(workHoursStr);
-
-  const shift: Shift = {
-    id: key,
-    date,
-    staffId,
-    shiftType: shiftType as 'normal' | 'early',
-    workHours: workHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
-    memo: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  dragBufferRef.current[key] = shift;
-  // setDragBuffer({ ...dragBufferRef.current }); ← この行を削除
-};
-
-const handleMouseUp = () => {
-  if (Object.keys(dragBufferRef.current).length > 0) {
-    setLocalShifts(prev => ({ ...prev, ...dragBufferRef.current }));
+  // 同じスタッフの前の日付で値が入っているものを探す
+  let prevIndex = -1;
+  let prevValue = '';
+  for (let i = currentIndex - 1; i >= 0; i--) {
+    const prevKey = `${staffId}-${dates[i]}`;
+    const prevShift = localShifts[prevKey] || shiftsMap.get(prevKey);
+    if (prevShift) {
+      prevIndex = i;
+      prevValue = `${prevShift.shiftType}-${prevShift.workHours || 'rest'}`;
+      break;
+    }
   }
-  setDragStart(null);
-  setDragValue(null);
-  // setDragBuffer({}); ← この行を削除
-  dragBufferRef.current = {};
+
+  // 前の値が見つかった場合、間を埋める
+  const newShifts: Record<string, Shift> = { [key]: shift };
+  
+  if (prevIndex !== -1 && currentIndex - prevIndex > 1) {
+    const [prevShiftType, prevWorkHoursStr] = prevValue.split('-');
+    const prevWorkHours = prevWorkHoursStr === 'rest' ? null : parseFloat(prevWorkHoursStr);
+    
+    for (let i = prevIndex + 1; i < currentIndex; i++) {
+      const fillKey = `${staffId}-${dates[i]}`;
+      newShifts[fillKey] = {
+        id: fillKey,
+        date: dates[i],
+        staffId,
+        shiftType: prevShiftType as 'normal' | 'early',
+        workHours: prevWorkHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
+        memo: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  setLocalShifts(prev => ({ ...prev, ...newShifts }));
 };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -372,7 +368,7 @@ const handleMouseUp = () => {
   };
 
   return (
-  <div className="p-6" onMouseUp={handleMouseUp} onClick={() => setOpenDropdown(null)}>
+  <div className="p-6" onClick={() => setOpenDropdown(null)}>
       <div className="mb-4 flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
           <button
@@ -723,19 +719,9 @@ const handleMouseUp = () => {
 
         return (
   <td 
-    key={date} 
-    className={`border p-1 relative select-none ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
-    onMouseDown={(e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      handleMouseDown(staff.id, date, value);
-    }}
-    onMouseEnter={() => {
-      if (openDropdown === null) {
-        handleMouseEnter(staff.id, date);
-      }
-    }}
-  >
+  key={date} 
+  className={`border p-1 relative select-none ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
+>
             <div
               className={`w-full text-center text-[10px] cursor-pointer select-none ${isRest ? 'text-red-600 font-bold' : ''}`}
               onClick={(e) => {
