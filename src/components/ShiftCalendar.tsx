@@ -1,5 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
+
+const SHIFT_OPTIONS = [
+  { value: '', label: '-', group: '' },
+  { value: 'normal-8.5', label: '8.5', group: '通常' },
+  { value: 'normal-7', label: '7', group: '通常' },
+  { value: 'normal-8', label: '8', group: '通常' },
+  { value: 'normal-9', label: '9', group: '通常' },
+  { value: 'normal-7.5', label: '7.5', group: '通常' },
+  { value: 'normal-5.5', label: '5.5', group: '通常' },
+  { value: 'normal-rest', label: '休', group: '通常' },
+  { value: 'early-8.5', label: '早8.5', group: '早出' },
+  { value: 'early-7', label: '早7', group: '早出' },
+  { value: 'early-8', label: '早8', group: '早出' },
+  { value: 'early-9', label: '早9', group: '早出' },
+  { value: 'early-7.5', label: '早7.5', group: '早出' },
+  { value: 'early-5.5', label: '早5.5', group: '早出' },
+  { value: 'early-rest', label: '早休', group: '早出' },
+];
+
 
 interface ShiftCalendarProps {
   currentShiftMonth: string;
@@ -18,6 +37,8 @@ interface ShiftCalendarProps {
   saveStaff: (staff: Omit<Staff, 'createdAt' | 'updatedAt'>) => Promise<void>;
   deleteStaff: (staffId: string) => Promise<void>;
 }
+
+
 
 export default function ShiftCalendar({
   currentShiftMonth,
@@ -47,6 +68,15 @@ const [dragValue, setDragValue] = useState<string | null>(null);
 const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 const [dragBuffer, setDragBuffer] = useState<Record<string, Shift>>({});
 const dragBufferRef = useRef<Record<string, Shift>>({});
+
+// ↓ これを追加
+const shiftsMap = useMemo(() => {
+  const map = new Map<string, Shift>();
+  shifts.forEach(shift => {
+    map.set(`${shift.staffId}-${shift.date}`, shift);
+  });
+  return map;
+}, [shifts]);
 
   const generateDates = () => {
     const dates: string[] = [];
@@ -184,7 +214,7 @@ const dragBufferRef = useRef<Record<string, Shift>>({});
 
   const getShift = (staffId: string, date: string): Shift | null => {
   const key = `${staffId}-${date}`;
-  return dragBuffer[key] || localShifts[key] || shifts.find(s => s.staffId === staffId && s.date === date) || null;
+  return dragBufferRef.current[key] || localShifts[key] || shiftsMap.get(key) || null;
 };
 
   const handleShiftChange = (staffId: string, date: string, value: string) => {
@@ -217,10 +247,9 @@ const dragBufferRef = useRef<Record<string, Shift>>({});
 };
 
 const handleMouseDown = (staffId: string, date: string, value: string) => {
-  if (value === '') return;
+  // if (value === '') return; ← この行を削除
   setDragStart({ staffId, date });
   setDragValue(value);
-  setDragBuffer({});
   dragBufferRef.current = {};
 };
 
@@ -244,7 +273,7 @@ const handleMouseEnter = (staffId: string, date: string) => {
   };
 
   dragBufferRef.current[key] = shift;
-  setDragBuffer({ ...dragBufferRef.current });
+  // setDragBuffer({ ...dragBufferRef.current }); ← この行を削除
 };
 
 const handleMouseUp = () => {
@@ -253,10 +282,9 @@ const handleMouseUp = () => {
   }
   setDragStart(null);
   setDragValue(null);
-  setDragBuffer({});
+  // setDragBuffer({}); ← この行を削除
   dragBufferRef.current = {};
 };
-
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -672,24 +700,6 @@ const handleMouseUp = () => {
   const restDays = monthShifts.filter(s => s?.workHours === null).length;
   const standardHours = getStandardHours(staff.id);
 
-  const shiftOptions = [
-    { value: '', label: '-', group: '' },
-    { value: 'normal-8.5', label: '8.5', group: '通常' },
-    { value: 'normal-7', label: '7', group: '通常' },
-    { value: 'normal-8', label: '8', group: '通常' },
-    { value: 'normal-9', label: '9', group: '通常' },
-    { value: 'normal-7.5', label: '7.5', group: '通常' },
-    { value: 'normal-5.5', label: '5.5', group: '通常' },
-    { value: 'normal-rest', label: '休', group: '通常' },
-    { value: 'early-8.5', label: '8.5', group: '早出' },
-    { value: 'early-7', label: '7', group: '早出' },
-    { value: 'early-8', label: '8', group: '早出' },
-    { value: 'early-9', label: '9', group: '早出' },
-    { value: 'early-7.5', label: '7.5', group: '早出' },
-    { value: 'early-5.5', label: '5.5', group: '早出' },
-    { value: 'early-rest', label: '休', group: '早出' },
-  ];
-
   return (
     <tr key={staff.id}>
       <td className="border p-2 font-medium sticky left-0 bg-white z-10">
@@ -707,20 +717,24 @@ const handleMouseUp = () => {
         const isOpen = openDropdown === cellKey;
 
         const displayText = value 
-          ? shiftOptions.find(opt => opt.value === value)?.label || ''
-          : '';
+  ? SHIFT_OPTIONS.find(opt => opt.value === value)?.label || ''
+  : '';
 
         return (
-          <td 
-            key={date} 
-            className={`border p-1 relative ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
-            onMouseDown={(e) => {
-              if (!isOpen) {
-                handleMouseDown(staff.id, date, value);
-              }
-            }}
-            onMouseEnter={() => handleMouseEnter(staff.id, date)}
-          >
+  <td 
+    key={date} 
+    className={`border p-1 relative select-none ${isEarly ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}
+    onMouseDown={(e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      handleMouseDown(staff.id, date, value);
+    }}
+    onMouseEnter={() => {
+      if (openDropdown === null) {
+        handleMouseEnter(staff.id, date);
+      }
+    }}
+  >
             <div
               className={`w-full text-center text-[10px] cursor-pointer select-none ${isRest ? 'text-red-600 font-bold' : ''}`}
               onClick={(e) => {
@@ -733,35 +747,44 @@ const handleMouseUp = () => {
             </div>
 
             {isOpen && (
-              <div 
-                className="absolute top-full left-0 bg-white border border-gray-300 shadow-lg z-50 min-w-[80px]"
-                onClick={(e) => e.stopPropagation()}
+  <div 
+    className="absolute top-full left-0 bg-white border border-gray-300 shadow-lg z-50 w-[240px] p-2"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {['通常', '早出'].map(group => (
+      <div key={group} className="mb-2">
+        <div className="text-[10px] font-bold mb-1 text-gray-600">{group}</div>
+        <div className="grid grid-cols-4 gap-1">
+          {SHIFT_OPTIONS
+            .filter(opt => opt.group === group)
+            .map(option => (
+              <div
+                key={option.value}
+                className="px-2 py-1 text-[10px] text-center hover:bg-blue-100 cursor-pointer border border-gray-200 rounded"
+                onClick={() => {
+                  handleShiftChange(staff.id, date, option.value);
+                  setOpenDropdown(null);
+                }}
               >
-                {['', '通常', '早出'].map(group => (
-                  <div key={group}>
-                    {group && (
-                      <div className="bg-gray-100 px-2 py-1 text-[10px] font-bold border-b">
-                        {group}
-                      </div>
-                    )}
-                    {shiftOptions
-                      .filter(opt => opt.group === group)
-                      .map(option => (
-                        <div
-                          key={option.value}
-                          className="px-2 py-1 text-[10px] hover:bg-blue-100 cursor-pointer"
-                          onClick={() => {
-                            handleShiftChange(staff.id, date, option.value);
-                            setOpenDropdown(null);
-                          }}
-                        >
-                          {option.label}
-                        </div>
-                      ))}
-                  </div>
-                ))}
+                {option.label}
               </div>
-            )}
+            ))}
+        </div>
+      </div>
+    ))}
+    <div className="border-t pt-2">
+      <div
+        className="px-2 py-1 text-[10px] text-center hover:bg-gray-100 cursor-pointer"
+        onClick={() => {
+          handleShiftChange(staff.id, date, '');
+          setOpenDropdown(null);
+        }}
+      >
+        クリア
+      </div>
+    </div>
+  </div>
+)}
           </td>
         );
       })}
