@@ -41,21 +41,6 @@ export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData,
     setCurrentDate(newDate);
   };
 
-  const isSameDate = (date1: string | Date, date2: Date): boolean => {
-  let d1: Date;
-  if (typeof date1 === 'string') {
-    // YYYY-MM-DD形式の文字列を現地時間で解釈
-    const [year, month, day] = date1.split('-').map(Number);
-    d1 = new Date(year, month - 1, day);
-  } else {
-    d1 = date1;
-  }
-  
-  return d1.getFullYear() === date2.getFullYear() &&
-         d1.getMonth() === date2.getMonth() &&
-         d1.getDate() === date2.getDate();
-};
-
   const getTodayTasks = () => {
     const tasks: {
       mori: TodayTask[];
@@ -260,12 +245,95 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
   await loadMoromiByBY(currentBY);
 }
 
+async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId: string) {
+  const updatedMoromi = moromiData.map(m => 
+    m.by === by && m.jungoId === jungoId 
+      ? { ...m, kenteiTankId: kenteiTankId || null }
+      : m
+  );
+  
+  await saveMoromiData(updatedMoromi, moromiProcesses);
+  await loadMoromiByBY(currentBY);
+}
+
   const calculateMoromiDays = (tomeDate: string, josoDate: string): number => {
     const tome = new Date(tomeDate);
     const joso = new Date(josoDate);
     const diffTime = Math.abs(joso.getTime() - tome.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
+  };
+
+  // 日付比較のヘルパー関数
+  const isSameDate = (date1: string | Date, date2: string | Date): boolean => {
+    const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
+    const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
+    return d1.toDateString() === d2.toDateString();
+  };
+
+  // もろみのステータスを判定する関数
+  const getMoromiStatus = (moromi: MoromiData, currentDate: Date) => {
+    // モト掛け仕込み日を取得
+    const motoKakeProcess = moromiProcesses.find(
+      p => p.jungoId === moromi.jungoId && p.processType === 'motoKake'
+    );
+    
+    const motoKakeDate = motoKakeProcess?.kakeShikomiDate 
+      ? new Date(motoKakeProcess.kakeShikomiDate) 
+      : null;
+    
+    const motoOroshiDate = new Date(moromi.motoOroshiDate);
+    const soeDate = new Date(moromi.soeShikomiDate);
+    const tomeDate = new Date(moromi.tomeShikomiDate);
+    const josoDate = new Date(moromi.josoDate);
+    
+    // 1. 準備中（モト掛け仕込み日より前）
+    if (motoKakeDate && currentDate < motoKakeDate) {
+      return { 
+        status: '準備', 
+        color: 'bg-gray-200 text-gray-700', 
+        sortOrder: 4 
+      };
+    } 
+    // 2. モト期間（モト掛け仕込み日〜モト卸日）
+    else if (motoKakeDate && currentDate >= motoKakeDate && currentDate <= motoOroshiDate) {
+      return { 
+        status: 'モト', 
+        color: 'bg-purple-200 text-purple-800', 
+        sortOrder: 3    // ← 1から3に変更
+      };
+    } 
+    // 3. 仕込み期間（添仕込日〜留仕込日）
+    else if (currentDate > motoOroshiDate && currentDate <= tomeDate) {
+      let detail = '';
+      if (isSameDate(soeDate, currentDate)) detail = '添';
+      else if (isSameDate(moromi.uchikomiDate, currentDate)) detail = '踊';
+      else if (isSameDate(moromi.nakaShikomiDate, currentDate)) detail = '仲';
+      else if (isSameDate(tomeDate, currentDate)) detail = '留';
+      
+      return { 
+        status: `仕込み${detail ? `~${detail}~` : ''}`, 
+        color: 'bg-blue-200 text-blue-800', 
+        sortOrder: 2    // ← そのまま2
+      };
+    } 
+    // 4. もろみ期間（留仕込日翌日〜上槽日前日）
+    else if (currentDate > tomeDate && currentDate < josoDate) {
+      const moromiDays = Math.ceil((currentDate.getTime() - tomeDate.getTime()) / (1000 * 60 * 60 * 24));
+      return { 
+        status: `もろみ~${moromiDays}日目~`, 
+        color: 'bg-green-200 text-green-800', 
+        sortOrder: 1    // ← 3から1に変更
+      };
+    } 
+    // 5. 完了（上槽日以降）
+    else {
+      return { 
+        status: '完了', 
+        color: 'bg-gray-300 text-gray-600', 
+        sortOrder: 5    // ← そのまま5
+      };
+    }
   };
 
  interface TaskSectionProps {
@@ -436,13 +504,35 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
     });
     
     const kojiTasks = sortedTasks.filter(t => t.processType?.includes('Koji'));
-    const otherTasks = sortedTasks.filter(t => !t.processType?.includes('Koji'));
-    const kojiTotal = calculateTotal(kojiTasks);
-    
-    return (
-      <>
-        {kojiTasks.map((task, index) => (
-          <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+const otherTasks = sortedTasks.filter(t => !t.processType?.includes('Koji'));
+const kojiTotal = calculateTotal(kojiTasks);
+
+// 同じ順号+工程でグループ化してサブ合計を計算
+const getGroupSubtotals = (tasks: TodayTask[]) => {
+  const groups = new Map<string, number>();
+  tasks.forEach(task => {
+    const key = `${task.jungoId}-${task.processType}`;
+    groups.set(key, (groups.get(key) || 0) + (task.amount || 0));
+  });
+  return groups;
+};
+
+const kojiSubtotals = getGroupSubtotals(kojiTasks);
+const otherSubtotals = getGroupSubtotals(otherTasks);
+
+return (
+  <>
+    {kojiTasks.map((task, index) => {
+      const key = `${task.jungoId}-${task.processType}`;
+      const isLastInGroup = index === kojiTasks.length - 1 || 
+        kojiTasks[index + 1]?.jungoId !== task.jungoId || 
+        kojiTasks[index + 1]?.processType !== task.processType;
+      const subtotal = kojiSubtotals.get(key) || 0;
+      const showSubtotal = isLastInGroup && subtotal > (task.amount || 0);
+      
+      return (
+        <div key={index}>
+          <div className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
             <span className="font-bold text-blue-600">{task.jungoId}号</span>
             <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
               {getProcessName(task.processType || '')}
@@ -450,12 +540,28 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
             <span className="ml-2 font-bold">{task.amount}kg</span>
             <span className="ml-1 text-gray-500">({task.riceType})</span>
           </div>
-        ))}
-        <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-          <span className="font-bold">合計: {kojiTotal}kg</span>
+          {showSubtotal && (
+            <div className="bg-blue-50 p-1 text-xs text-right text-blue-700 font-semibold">
+              → {task.jungoId}号 {getProcessName(task.processType || '')} 合計: {subtotal}kg
+            </div>
+          )}
         </div>
-        {otherTasks.map((task, index) => (
-          <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+      );
+    })}
+    <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+      <span className="font-bold">合計: {kojiTotal}kg</span>
+    </div>
+    {otherTasks.map((task, index) => {
+      const key = `${task.jungoId}-${task.processType}`;
+      const isLastInGroup = index === otherTasks.length - 1 || 
+        otherTasks[index + 1]?.jungoId !== task.jungoId || 
+        otherTasks[index + 1]?.processType !== task.processType;
+      const subtotal = otherSubtotals.get(key) || 0;
+      const showSubtotal = isLastInGroup && subtotal > (task.amount || 0);
+      
+      return (
+        <div key={index}>
+          <div className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
             <span className="font-bold text-blue-600">{task.jungoId}号</span>
             <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
               {getProcessName(task.processType || '')}
@@ -463,9 +569,16 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
             <span className="ml-2 font-bold">{task.amount}kg</span>
             <span className="ml-1 text-gray-500">({task.riceType})</span>
           </div>
-        ))}
-      </>
-    );
+          {showSubtotal && (
+            <div className="bg-blue-50 p-1 text-xs text-right text-blue-700 font-semibold">
+              → {task.jungoId}号 {getProcessName(task.processType || '')} 合計: {subtotal}kg
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </>
+);
   }}
 />
     </div>
@@ -592,7 +705,7 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
           <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm flex items-center justify-between">
             <div>
               <span className="font-bold text-blue-600">{task.jungoId}号</span>
-              <span className="ml-2 text-gray-600">{task.tankNo}</span>
+              <span className="ml-2 text-gray-600">No.{task.tankNo}→</span>
               <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">
                 {task.brewingCategory}
               </span>
@@ -623,49 +736,100 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
             <thead className="bg-slate-100 border-b-2 border-slate-300">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-bold">順号</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">ステータス</th>
                 <th className="px-4 py-3 text-left text-sm font-bold">添タンク</th>
-<th className="px-4 py-3 text-left text-sm font-bold">タンク</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">タンク</th>
                 <th className="px-4 py-3 text-left text-sm font-bold">仕込規模</th>
                 <th className="px-4 py-3 text-left text-sm font-bold">仕込区分</th>
                 <th className="px-4 py-3 text-left text-sm font-bold">留日</th>
                 <th className="px-4 py-3 text-left text-sm font-bold">上槽予定</th>
                 <th className="px-4 py-3 text-left text-sm font-bold">日数</th>
+                <th className="px-4 py-3 text-left text-sm font-bold">検定タンク</th>
               </tr>
             </thead>
             <tbody>
-              {moromiData.map((moromi: MoromiData) => {
-                const moromiDays = calculateMoromiDays(moromi.tomeDate, moromi.josoDate);
-                return (
-                  <Fragment key={moromi.jungoId}>
-                    <tr
-                      onClick={() => handleRowClick(moromi.jungoId)}
-                      className="border-b hover:bg-blue-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3 font-bold text-blue-700">{moromi.jungoId}号</td>
-<td className="px-4 py-3">
-  <select
-    value={moromi.soeTankId || ''}
-    onChange={(e) => handleSoeTankChange(moromi.by, moromi.jungoId, e.target.value)}
-    onClick={(e) => e.stopPropagation()}
-    className="border rounded px-2 py-1 text-sm"
-  >
-    <option value="">-</option>
-    <option value="550">No.550</option>
-    <option value="552">No.552</option>
-    <option value="803">No.803</option>
-    <option value="804">No.804</option>
-  </select>
-</td>
+              {[...moromiData]
+                .sort((a, b) => {
+                  const statusA = getMoromiStatus(a, currentDate);
+                  const statusB = getMoromiStatus(b, currentDate);
+                  
+                  if (statusA.sortOrder !== statusB.sortOrder) {
+                    return statusA.sortOrder - statusB.sortOrder;
+                  }
+                  
+                  return parseInt(a.jungoId) - parseInt(b.jungoId);
+                })
+                .map((moromi: MoromiData) => {
+                  const moromiDays = calculateMoromiDays(moromi.tomeDate, moromi.josoDate);
+                  const statusInfo = getMoromiStatus(moromi, currentDate);
+                  return (
+                    <Fragment key={moromi.jungoId}>
+                      <tr
+                        onClick={() => handleRowClick(moromi.jungoId)}
+                        className="border-b hover:bg-blue-50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3 font-bold text-blue-700">{moromi.jungoId}号</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${statusInfo.color}`}>
+                            {statusInfo.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={moromi.soeTankId || ''}
+                            onChange={(e) => handleSoeTankChange(moromi.by, moromi.jungoId, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="">-</option>
+                            <option value="550">No.550</option>
+                            <option value="552">No.552</option>
+                            <option value="803">No.803</option>
+                            <option value="804">No.804</option>
+                          </select>
+                        </td>
 <td className="px-4 py-3">{moromi.tankNo ? `No.${moromi.tankNo}` : '-'}</td>
 <td className="px-4 py-3">{moromi.brewingSize}kg</td>
                       <td className="px-4 py-3">{moromi.brewingCategory}</td>
                       <td className="px-4 py-3">{moromi.tomeDate.substring(5)}</td>
-                      <td className="px-4 py-3">{moromi.josoDate.substring(5)}</td>
-                      <td className="px-4 py-3">{moromiDays}日</td>
-                    </tr>
-                    {expandedJungo === moromi.jungoId && (
-  <tr>
-    <td colSpan={8} className="px-4 py-4 bg-slate-50">
+                        <td className="px-4 py-3">{moromi.josoDate.substring(5)}</td>
+                        <td className="px-4 py-3">{moromiDays}日</td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={moromi.kenteiTankId || ''}
+                            onChange={(e) => handleKenteiTankChange(moromi.by, moromi.jungoId, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="">-</option>
+                            <option value="31">No.31</option>
+                            <option value="33">No.33</option>
+                            <option value="99">No.99</option>
+                            <option value="101">No.101</option>
+                            <option value="108">No.108</option>
+                            <option value="102">No.102</option>
+                            <option value="103">No.103</option>
+                            <option value="100">No.100</option>
+                            <option value="107">No.107</option>
+                            <option value="109">No.109</option>
+                            <option value="132">No.132</option>
+                            <option value="131">No.131</option>
+                            <option value="135">No.135</option>
+                            <option value="40">No.40</option>
+                            <option value="42">No.42</option>
+                            <option value="87">No.87</option>
+                            <option value="83">No.83</option>
+                            <option value="262">No.262</option>
+                            <option value="263">No.263</option>
+                            <option value="288">No.288</option>
+                            <option value="888">No.888</option>
+                            <option value="264">No.264</option>
+                          </select>
+                        </td>
+                      </tr>
+                   {expandedJungo === moromi.jungoId && (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-4 bg-slate-50">
                           <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white p-4 rounded">
                               <h3 className="font-bold mb-2">基本情報</h3>

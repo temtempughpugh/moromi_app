@@ -9,6 +9,7 @@ export interface MoromiData {
   josoDate: string;
   tankNo: string;
   soeTankId: string | null;
+  kenteiTankId: string | null;  // ← この行を追加
   memo: string | null;
   motoOroshiDate: string;
   soeShikomiDate: string;
