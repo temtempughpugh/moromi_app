@@ -203,8 +203,11 @@ useEffect(() => {
   const key = `${staffId}-${date}`;
   
   if (value === '') {
-  // 削除マークを付ける（nullで示す）
-  setLocalShifts(prev => ({ ...prev, [key]: null as any }));
+  setLocalShifts(prev => {
+    const newShifts = { ...prev };
+    delete newShifts[key];
+    return newShifts;
+  });
   return;
 }
 
@@ -383,11 +386,13 @@ alert('保存しました');
     });
     
     // すべてのinput要素を値に置き換え
-    clonedTable?.querySelectorAll('input').forEach(input => {
-      const span = document.createElement('span');
-      span.textContent = input.value || '';
-      input.replaceWith(span);
-    });
+  // Replace input elements with their values
+clonedTable?.querySelectorAll('input').forEach(input => {
+  const span = document.createElement('span');
+  const htmlInput = input as HTMLInputElement;
+  span.textContent = htmlInput.value || htmlInput.defaultValue || '';
+  input.replaceWith(span);
+});
     
     printWindow?.document.write(`
       <!DOCTYPE html>
@@ -413,16 +418,22 @@ alert('保存しました');
             table-layout: fixed;
           }
           th, td { 
-            border: 0.5px solid #666; 
-            padding: 1mm; 
-            text-align: center;
-            line-height: 1.2;
-            overflow: hidden;
-          }
-          th:first-child, td:first-child { 
-            width: 12%; 
-            font-size: 5pt;
-          }
+  border: 0.5px solid #666; 
+  padding: 1mm; 
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+}
+th:first-child, td:first-child { 
+  width: 12%; 
+  font-size: 5pt;
+  text-align: left;
+}
+tbody tr.bg-pink-50 ~ tr td:first-child,
+tbody tr.bg-pink-50 td:first-child,
+tbody tr.bg-gray-100 th:first-child { 
+  text-align: right !important;
+}
           .bg-red-200 { background-color: #fecaca !important; }
           .bg-blue-200 { background-color: #bfdbfe !important; }
           .bg-green-200 { background-color: #bbf7d0 !important; }

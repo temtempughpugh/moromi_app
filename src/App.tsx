@@ -1,4 +1,4 @@
-import { useState } from 'react'; 
+import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import CSVUpdate from './components/CSVUpdate';
 import ShiftCalendar from './components/ShiftCalendar';
@@ -10,6 +10,28 @@ type Page = 'dashboard' | 'csv-update' | 'shift';
 export default function App() {
   const dataContext = useData();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  useEffect(() => {
+    console.log('useEffect実行されました');
+    
+    const preventSwipeBack = (e: WheelEvent) => {
+      console.log('wheel event発火');
+      console.log('deltaX:', e.deltaX, 'deltaY:', e.deltaY);
+      
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && e.deltaX < 0) {
+        console.log('左スクロール検知');
+        e.preventDefault();
+      }
+    };
+
+    console.log('addEventListener登録開始');
+    window.addEventListener('wheel', preventSwipeBack, { passive: false });
+    console.log('addEventListener登録完了');
+    
+    return () => {
+      console.log('cleanup実行');
+      window.removeEventListener('wheel', preventSwipeBack);
+    };
+  }, []);
 
   if (dataContext.isLoading) {
     return (

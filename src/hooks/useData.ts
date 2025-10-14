@@ -158,10 +158,10 @@ export function useData() {
     setShifts(data);
   };
 
-  const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) => {
-    await saveShiftsToSupabase(shiftsData);
-    await loadShiftsByMonth(currentShiftMonth);
-  };
+const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) => {
+  await saveShiftsToSupabase(shiftsData, currentShiftMonth);
+  await loadShiftsByMonth(currentShiftMonth);
+};
 
   const loadMonthlySettings = async (yearMonth: string) => {
     const data = await getMonthlySettings(yearMonth);

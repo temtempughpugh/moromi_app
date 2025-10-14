@@ -252,22 +252,37 @@ export const getShiftsByMonth = async (yearMonth: string): Promise<Shift[]> => {
   }));
 };
 
-export const saveShifts = async (shifts: Omit<Shift, 'createdAt' | 'updatedAt'>[]): Promise<void> => {
-  const records = shifts.map(shift => ({
-    id: shift.id,
-    date: shift.date,
-    staff_id: shift.staffId,
-    shift_type: shift.shiftType,
-    work_hours: shift.workHours,
-    memo: shift.memo,
-    updated_at: new Date().toISOString(),
-  }));
-
-  const { error } = await supabase
+export const saveShifts = async (shifts: Omit<Shift, 'createdAt' | 'updatedAt'>[], yearMonth: string): Promise<void> => {
+  // 先に該当月のデータを全削除
+  const startDate = `${yearMonth}-01`;
+  const endDate = `${yearMonth}-31`;
+  
+  const { error: deleteError } = await supabase
     .from('shifts')
-    .upsert(records);
+    .delete()
+    .gte('date', startDate)
+    .lte('date', endDate);
 
-  if (error) throw error;
+  if (deleteError) throw deleteError;
+
+  // 新しいデータを挿入
+  if (shifts.length > 0) {
+    const records = shifts.map(shift => ({
+      id: shift.id,
+      date: shift.date,
+      staff_id: shift.staffId,
+      shift_type: shift.shiftType,
+      work_hours: shift.workHours,
+      memo: shift.memo,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('shifts')
+      .insert(records);
+
+    if (error) throw error;
+  }
 };
 
 export const deleteShift = async (shiftId: string): Promise<void> => {
