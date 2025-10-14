@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { MoromiData, MoromiProcess } from '../utils/types';
 import { Fragment } from 'react';
+import { KojiService } from '../services/KojiService';
 
 interface DashboardProps {
   moromiData: MoromiData[];
@@ -16,6 +17,7 @@ interface TodayTask {
   amount?: number;
   brewingCategory?: string;
   brewingSize?: number;
+  process?: MoromiProcess;
 }
 
 export default function Dashboard({ moromiData, moromiProcesses }: DashboardProps) {
@@ -115,10 +117,11 @@ export default function Dashboard({ moromiData, moromiProcesses }: DashboardProp
 
         if (process.dekojiDate && isSameDate(process.dekojiDate, currentDate)) {
           tasks.dekoji.push({
-            jungoId: moromi.jungoId,
+            jungoId: process.jungoId,
             processType: process.processType,
             riceType: process.riceType,
-            amount: process.amount || 0
+            amount: process.amount || 0,
+            process: process
           });
         }
 
@@ -165,6 +168,26 @@ export default function Dashboard({ moromiData, moromiProcesses }: DashboardProp
     };
     return names[type] || type;
   };
+
+  // 📁 src/components/Dashboard.tsx の178行目付近
+
+// ✅ 正しい修正（KojiServiceの実装に合わせる）
+const getDekojiDistribution = (tasks: TodayTask[]): string => {
+  if (tasks.length === 0) return '';
+  
+  try {
+    const processes = tasks.map(t => t.process).filter(p => p) as MoromiProcess[];
+    const lots = KojiService.calculateDistribution(processes, 120);  // ← DekojiLot[] を直接受け取る
+    const shelfDist = KojiService.calculateShelfDistribution(lots);  // ← lots をそのまま渡す
+    
+    if (shelfDist.error) return '';
+    
+    return `(${shelfDist.columnCounts.join(',')})`;
+  } catch (error) {
+    console.error('配分計算エラー:', error);
+    return '';
+  }
+};
 
   const getProcessColor = (processType: string): string => {
   if (processType === 'motoKoji') return 'bg-red-300 text-red-900';
@@ -396,15 +419,31 @@ const calculateTotal = (tasks: TodayTask[]): number => {
       />
 
       <TaskSection
-        title="✨ 出麹"
+        title="🌾 出麹"
         tasks={todayTasks.dekoji}
         renderContent={(tasks) => {
+          const distribution = getDekojiDistribution(tasks);
           const total = calculateTotal(tasks);
+          
           return (
             <>
+              {distribution && (
+                <div className="mb-2">
+                  <button 
+                    onClick={() => {
+                      // ここで出麹ページへ遷移する処理を追加
+                      // 後で実装
+                    }}
+                    className="inline-block bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-sm font-bold text-green-700 transition-colors cursor-pointer"
+                  >
+                    📊 棚配分 {distribution}
+                  </button>
+                </div>
+              )}
+              
               {tasks.map((task, index) => (
                 <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                  <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                  <span className="font-bold text-green-600">{task.jungoId}号</span>
                   <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
                     {getProcessName(task.processType || '')}
                   </span>
@@ -412,9 +451,12 @@ const calculateTotal = (tasks: TodayTask[]): number => {
                   <span className="ml-1 text-gray-500">({task.riceType})</span>
                 </div>
               ))}
-              <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-                <span className="font-bold">合計: {total}kg</span>
-              </div>
+              
+              {tasks.length > 0 && (
+                <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                  <span className="font-bold">合計: {total}kg</span>
+                </div>
+              )}
             </>
           );
         }}

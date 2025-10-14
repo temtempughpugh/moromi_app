@@ -4,7 +4,7 @@ import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from './typ
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
-  // moromi_data を保存
+  // moromi_data を保存（既存と同じ）
   const { error: moromiError } = await supabase
     .from('moromi_data')
     .upsert(moromiDataList.map(m => ({
@@ -28,7 +28,7 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
 
   if (moromiError) throw moromiError;
 
-  // moromi_process を保存
+  // moromi_process を保存（新規フィールド追加）
   const { error: processError } = await supabase
     .from('moromi_process')
     .upsert(processList.map(p => ({
@@ -44,11 +44,34 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
       dekoji_date: p.dekojiDate,
       kake_shikomi_date: p.kakeShikomiDate,
       shikomi_date: p.shikomiDate,
+      // 新規フィールド
+      predicted_dekoji_rate: p.predictedDekojiRate,
+      last_sheet_weight: p.lastSheetWeight,
+      actual_dekoji_rate: p.actualDekojiRate,
+      storage_type: p.storageType,
       updated_at: new Date().toISOString()
     })), { onConflict: 'by,jungo_id,process_type' });
 
   if (processError) throw processError;
 }
+
+export async function updateDekojiData(processes: MoromiProcess[]): Promise<void> {
+  const { error } = await supabase
+    .from('moromi_process')
+    .upsert(processes.map(p => ({
+      by: p.by,
+      jungo_id: p.jungoId,
+      process_type: p.processType,
+      predicted_dekoji_rate: p.predictedDekojiRate,
+      last_sheet_weight: p.lastSheetWeight,
+      actual_dekoji_rate: p.actualDekojiRate,
+      storage_type: p.storageType,
+      updated_at: new Date().toISOString()
+    })), { onConflict: 'by,jungo_id,process_type' });
+
+  if (error) throw error;
+}
+
 
 // BY一覧取得
 export async function getAvailableBYs(): Promise<number[]> {
@@ -117,6 +140,10 @@ export async function getProcessesByMoromi(by: number, jungoId: string): Promise
     dekojiDate: p.dekoji_date,
     kakeShikomiDate: p.kake_shikomi_date,
     shikomiDate: p.shikomi_date,
+     predictedDekojiRate: p.predicted_dekoji_rate,
+    lastSheetWeight: p.last_sheet_weight,
+    actualDekojiRate: p.actual_dekoji_rate,
+    storageType: p.storage_type,
   }));
 }
 
