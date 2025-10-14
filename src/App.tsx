@@ -3,13 +3,26 @@ import Dashboard from './components/Dashboard';
 import CSVUpdate from './components/CSVUpdate';
 import ShiftCalendar from './components/ShiftCalendar';
 import StaffManagement from './components/StaffManagement';
+import DekojiPage from './components/DekojiPage';
 import { useData } from './hooks/useData';
 
-type Page = 'dashboard' | 'csv-update' | 'shift';
+type Page = 'dashboard' | 'tank-assignment' | 'tank-settings' | 'analysis-settings' | 'csv-update' | 'shift' | 'dekoji';
 
 export default function App() {
   const dataContext = useData();
+useEffect(() => {
+  const handleNavigate = (e: CustomEvent) => {
+    setDekojiDate(e.detail.date);
+    setCurrentPage('dekoji');
+  };
+  
+  window.addEventListener('navigateToDekojiPage', handleNavigate as EventListener);
+  return () => window.removeEventListener('navigateToDekojiPage', handleNavigate as EventListener);
+}, []);
+
+
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+const [dekojiDate, setDekojiDate] = useState<string>('');
   
   useEffect(() => {
   const preventSwipeBack = (e: WheelEvent) => {
@@ -150,6 +163,13 @@ export default function App() {
             getAllData={dataContext.getAllData}
           />
         )}
+        {currentPage === 'dekoji' && (
+  <DekojiPage 
+    dataContext={dataContext}
+    dekojiDate={dekojiDate}
+    onBack={() => setCurrentPage('dashboard')}
+  />
+)}
       </main>
     </div>
   );

@@ -430,14 +430,14 @@ const calculateTotal = (tasks: TodayTask[]): number => {
               {distribution && (
                 <div className="mb-2">
                   <button 
-                    onClick={() => {
-                      // ここで出麹ページへ遷移する処理を追加
-                      // 後で実装
-                    }}
-                    className="inline-block bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-sm font-bold text-green-700 transition-colors cursor-pointer"
-                  >
-                    📊 棚配分 {distribution}
-                  </button>
+  onClick={() => {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    window.dispatchEvent(new CustomEvent('navigateToDekojiPage', { detail: { date: dateStr } }));
+  }}
+  className="inline-block bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-sm font-bold text-green-700 transition-colors cursor-pointer"
+>
+  📊 棚配分 {distribution}
+</button>
                 </div>
               )}
               
