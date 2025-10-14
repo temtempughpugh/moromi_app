@@ -177,18 +177,38 @@ const getDekojiDistribution = (tasks: TodayTask[]): string => {
   
   try {
     const processes = tasks.map(t => t.process).filter(p => p) as MoromiProcess[];
-    const lots = KojiService.calculateDistribution(processes, 120);  // ← DekojiLot[] を直接受け取る
-    const shelfDist = KojiService.calculateShelfDistribution(lots);  // ← lots をそのまま渡す
+    
+    // 掛米工程も取得
+    const jungoIds = [...new Set(processes.map(p => p.jungoId))];
+    const kakeProcesses = moromiProcesses.filter(p =>
+      jungoIds.includes(p.jungoId) &&
+      (p.processType === 'motoKake' || 
+       p.processType === 'soeKake' || 
+       p.processType === 'nakaKake' || 
+       p.processType === 'tomeKake')
+    );
+    
+    const lots = KojiService.calculateDistribution([...processes, ...kakeProcesses], 120);
+    const shelfDist = KojiService.calculateShelfDistribution(lots);
     
     if (shelfDist.error) return '';
     
-    return `(${shelfDist.columnCounts.join(',')})`;
+    // 保管方法も表示（用途付き）
+    // 保管方法も表示（用途付き）
+const storageInfo = lots
+  .filter(lot => lot.storageType)
+  .map(lot => {
+    const usageName = lot.usage === '酒母' ? 'モト' : lot.usage;
+    return `${lot.jungoId}号${usageName}${lot.storageType === '冷蔵' ? '💧' : '🧊'}`;
+  })
+  .join(' ');
+    
+    return `(${shelfDist.columnCounts.join(',')})${storageInfo ? ' ' + storageInfo : ''}`;
   } catch (error) {
     console.error('配分計算エラー:', error);
     return '';
   }
 };
-
   const getProcessColor = (processType: string): string => {
   if (processType === 'motoKoji') return 'bg-red-300 text-red-900';
   if (processType === 'soeKoji') return 'bg-blue-300 text-blue-900';

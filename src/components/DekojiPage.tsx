@@ -21,26 +21,30 @@ export default function DekojiPage({ dataContext, dekojiDate, onBack }: DekojiPa
   const [totalSheetCount, setTotalSheetCount] = useState(0);
 
   useEffect(() => {
-  if (!dekojiDate || !dataContext.moromiProcesses) return;
+    if (!dekojiDate || !dataContext.moromiProcesses) return;
 
-  const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-    p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
-  );
+    const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+      p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+    );
 
-  if (dekojiProcesses.length === 0) {
-    alert('この日の出麹作業はありません');
-    onBack();
-    return;
-  }
+    if (dekojiProcesses.length === 0) {
+      alert('この日の出麹作業はありません');
+      onBack();
+      return;
+    }
 
-  // ✅ 出麹する順号の全工程を取得
-const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
-const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-  jungoIds.includes(p.jungoId)
-);
+    // 対応する掛米工程を取得
+    const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
+    const kakeProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+      jungoIds.includes(p.jungoId) && 
+      (p.processType === 'motoKake' || 
+       p.processType === 'soeKake' || 
+       p.processType === 'nakaKake' || 
+       p.processType === 'tomeKake')
+    );
 
-  calculateAll(allRelatedProcesses, dekojiRate);
-}, [dekojiDate, dataContext.moromiProcesses]);
+    calculateAll([...dekojiProcesses, ...kakeProcesses], dekojiRate);
+  }, [dekojiDate, dataContext.moromiProcesses]);
 
   const calculateAll = (processes: MoromiProcess[], rate: number) => {
     const calculatedLots = KojiService.calculateDistribution(processes, rate);
@@ -56,21 +60,25 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
   };
 
   const handleDekojiRateChange = (value: number) => {
-  setDekojiRate(value);
-  if (!dekojiDate || !dataContext.moromiProcesses) return;
+    setDekojiRate(value);
+    if (!dekojiDate || !dataContext.moromiProcesses) return;
 
-  const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-    p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
-  );
+    const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+      p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+    );
 
-  // ✅ こちらも同じ修正
-  const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
-  const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-    jungoIds.includes(p.jungoId)
-  );
+    // 対応する掛米工程を取得
+    const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
+    const kakeProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+      jungoIds.includes(p.jungoId) && 
+      (p.processType === 'motoKake' || 
+       p.processType === 'soeKake' || 
+       p.processType === 'nakaKake' || 
+       p.processType === 'tomeKake')
+    );
 
-  calculateAll(allRelatedProcesses, value);
-};
+    calculateAll([...dekojiProcesses, ...kakeProcesses], value);
+  };
 
   const handleLastSheetWeightChange = (value: string) => {
     setLastSheetWeight(value);
@@ -112,54 +120,41 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
   };
 
   const getUsageColor = (usage: string): string => {
-    if (usage === '酒母') return 'bg-red-50';
-    if (usage === '添') return 'bg-blue-50';
-    if (usage === '仲') return 'bg-green-50';
-    if (usage === '留') return 'bg-yellow-50';
-    return 'bg-gray-50';
-  };
-
-  const getUsageBadgeColor = (usage: string): string => {
-    if (usage === '酒母') return 'bg-red-100 text-red-700';
-    if (usage === '添') return 'bg-blue-100 text-blue-700';
-    if (usage === '仲') return 'bg-green-100 text-green-700';
-    if (usage === '留') return 'bg-yellow-100 text-yellow-700';
-    return 'bg-gray-100 text-gray-700';
+    if (usage === '酒母') return 'bg-purple-100 border-purple-300';
+    if (usage === '添') return 'bg-blue-100 border-blue-300';
+    if (usage === '仲') return 'bg-green-100 border-green-300';
+    if (usage === '留') return 'bg-yellow-100 border-yellow-300';
+    return 'bg-gray-100 border-gray-300';
   };
 
   const getProcessColor = (processType: string): string => {
-    if (processType === 'motoKoji') return 'bg-red-300 text-red-900';
-    if (processType === 'soeKoji') return 'bg-blue-300 text-blue-900';
-    if (processType === 'nakaKoji') return 'bg-green-300 text-green-900';
-    if (processType === 'tomeKoji') return 'bg-yellow-300 text-yellow-900';
-    return 'bg-gray-100 text-gray-700';
+    if (processType === 'motoKoji') return 'bg-purple-200 text-purple-800';
+    if (processType === 'soeKoji') return 'bg-blue-200 text-blue-800';
+    if (processType === 'nakaKoji') return 'bg-green-200 text-green-800';
+    if (processType === 'tomeKoji') return 'bg-yellow-200 text-yellow-800';
+    return 'bg-gray-200 text-gray-800';
   };
 
-  const getProcessName = (type: string): string => {
-    const names: { [key: string]: string } = {
-      motoKoji: 'モト麹',
-      soeKoji: '初麹',
-      nakaKoji: '仲麹',
-      tomeKoji: '留麹',
-    };
-    return names[type] || type;
+  const getProcessName = (processType: string): string => {
+    if (processType === 'motoKoji') return 'モト麹';
+    if (processType === 'soeKoji') return '初麹';
+    if (processType === 'nakaKoji') return '仲麹';
+    if (processType === 'tomeKoji') return '留麹';
+    return processType;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="hover:bg-white/10 px-3 py-2 rounded transition"
-              >
-                ← 戻る
-              </button>
-              <h1 className="text-2xl font-bold">🌾 出麹作業</h1>
-            </div>
-            <div className="text-xl font-bold">{dekojiDate}</div>
+      <nav className="bg-gradient-to-r from-blue-900 to-blue-700 text-white shadow-2xl sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">🌾 出麹作業 - {dekojiDate}</h1>
+            <button
+              onClick={onBack}
+              className="px-6 py-2 bg-white text-blue-900 rounded-lg font-bold hover:bg-blue-50 transition"
+            >
+              ← 戻る
+            </button>
           </div>
         </div>
       </nav>
@@ -197,14 +192,19 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
               <div className="p-4 border-b border-gray-200">
                 <h3 className="text-sm font-bold mb-2 text-green-800">🌾 今日の出麹</h3>
                 <div className="space-y-1">
-                  {lots.flatMap(lot => lot.processes).map((process, index) => (
-                    <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                      <span className="font-bold text-green-600">{process.jungoId}号</span>
-                      <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(process.processType)}`}>
-                        {getProcessName(process.processType)}
+                  {lots.map((lot, lotIndex) => (
+                    <div key={lotIndex} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                      <span className="font-bold text-green-600">{lot.jungoId}号</span>
+                      <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(lot.processes[0].processType)}`}>
+                        {getProcessName(lot.processes[0].processType)}
                       </span>
-                      <span className="ml-2 font-bold">{process.amount}kg</span>
-                      <span className="ml-1 text-gray-500">({process.riceType})</span>
+                      <span className="ml-2 font-bold">{lot.riceWeight}kg</span>
+                      <span className="ml-1 text-gray-500">({lot.processes[0].riceType})</span>
+                      {lot.storageType && (
+                        <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                          {lot.storageType === '冷蔵' ? '💧 冷蔵' : '🧊 冷凍'}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -246,11 +246,6 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
                                 <>
                                   <div className="text-xs font-bold">
                                     {cell.jungoId}号：{cell.usage}
-                                    {cell.storageType && (
-                                      <span className="ml-1">
-                                        {cell.storageType === '冷蔵' ? '❄️' : '🧊'}
-                                      </span>
-                                    )}
                                   </div>
                                   <div className="text-xs text-gray-600">
                                     {cell.weightPerSheet?.toFixed(1)}kg
@@ -261,6 +256,28 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
                           ))}
                         </tr>
                       ))}
+                      <tr className="bg-slate-100">
+                        <td className="border border-gray-300 px-2 py-2 text-center font-bold">
+                          保管
+                        </td>
+                        {['A', 'B', 'C', 'D'].map((col) => {
+                          const columnCells = distribution.matrix.map(row => 
+                            row[['A', 'B', 'C', 'D'].indexOf(col)]
+                          ).filter(cell => cell.jungoId);
+                          const storageType = columnCells.length > 0 ? columnCells[0].storageType : null;
+                          return (
+                            <td key={col} className="border border-gray-300 px-2 py-2 text-center text-xs font-semibold">
+                              {storageType ? (
+                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                                  {storageType === '冷蔵' ? '❄️ 冷蔵' : '🧊 冷凍'}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -287,26 +304,19 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
                       <div>
                         <div className="text-sm font-bold">
                           {lot.jungoId}号{lot.usage === '酒母' ? 'モト' : lot.usage}麹
+                          {lot.storageType && (
+                            <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-semibold">
+                              {lot.storageType === '冷蔵' ? '❄️ 冷蔵' : '🧊 冷凍'}
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-gray-600">
                           {lot.sheetCount}枚 × {lot.weightPerSheet.toFixed(1)}kg = {lot.predictedWeight.toFixed(1)}kg
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-blue-600">
-                        {lot.columns.join('・')}列
-                      </div>
-                      <div className="text-xs">
-                        <span className={`px-2 py-0.5 rounded font-semibold ${getUsageBadgeColor(lot.usage)}`}>
-                          {lot.usage}
-                        </span>
-                        {lot.storageType && (
-                          <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded font-semibold">
-                            {lot.storageType === '冷蔵' ? '❄️' : '🧊'}
-                          </span>
-                        )}
-                      </div>
+                    <div className="text-xs text-gray-500">
+                      列: {lot.columns.join(', ')}
                     </div>
                   </div>
                 </div>
@@ -317,57 +327,53 @@ const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess
           {/* 右列: 真の出麹歩合計算 */}
           <div className="bg-white rounded-xl shadow-lg">
             <div className="bg-slate-800 px-4 py-3">
-              <h2 className="text-xl font-bold text-white">📊 真の出麹歩合計算</h2>
+              <h2 className="text-xl font-bold text-white">🧮 真の出麹歩合</h2>
             </div>
-            <div className="p-4 space-y-3">
-              <div className="bg-slate-50 rounded p-3">
-                <div className="text-xs text-gray-600 mb-1">総白米</div>
-                <div className="text-lg font-bold">{totalRiceWeight}kg</div>
-              </div>
-              
-              <div className="bg-slate-50 rounded p-3">
-                <div className="text-xs text-gray-600 mb-1">総枚数</div>
-                <div className="text-lg font-bold">{totalSheetCount}枚</div>
-              </div>
-              
-              <div className="bg-slate-50 rounded p-3">
-                <div className="text-xs text-gray-600 mb-1">予想出麹歩合</div>
-                <div className="text-lg font-bold text-blue-700">{dekojiRate.toFixed(1)}%</div>
+            <div className="p-4 space-y-4">
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <div className="text-sm text-gray-600 mb-1">総白米重量</div>
+                <div className="text-2xl font-bold text-blue-700">{totalRiceWeight.toFixed(1)} kg</div>
               </div>
 
-              <div className="border-t border-gray-200 pt-3">
-                <div className="mb-2">
-                  <label className="text-xs font-bold text-gray-600 block mb-1">最後の1枚</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={lastSheetWeight}
-                      onChange={(e) => handleLastSheetWeightChange(e.target.value)}
-                      placeholder="12.3"
-                      step="0.1"
-                      className="border-2 border-gray-300 rounded px-3 py-1 w-full font-bold focus:border-blue-500 focus:outline-none"
-                    />
-                    <span className="text-sm font-bold">kg</span>
-                  </div>
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <div className="text-sm text-gray-600 mb-1">総枚数</div>
+                <div className="text-2xl font-bold text-blue-700">{totalSheetCount} 枚</div>
+              </div>
+
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="text-sm text-gray-600 mb-1">予想出麹重量</div>
+                <div className="text-2xl font-bold text-green-700">
+                  {(totalRiceWeight * (dekojiRate / 100)).toFixed(1)} kg
                 </div>
-
-                {actualRate !== null && (
-                  <div className="bg-green-50 rounded p-3 border-2 border-green-200 text-center mb-3">
-                    <div className="text-xs text-gray-600">真の出麹歩合</div>
-                    <div className="text-2xl font-bold text-green-700">{actualRate.toFixed(1)}%</div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      総出麹：{((totalRiceWeight - 10) * (dekojiRate / 100) + parseFloat(lastSheetWeight)).toFixed(1)}kg
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleSave}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition"
-                >
-                  💾 保存
-                </button>
               </div>
+
+              <div className="border-t-2 border-gray-300 pt-4">
+                <label className="text-sm font-bold text-gray-700 block mb-2">
+                  最後の1枚の重量 (kg)
+                </label>
+                <input
+                  type="number"
+                  value={lastSheetWeight}
+                  onChange={(e) => handleLastSheetWeightChange(e.target.value)}
+                  step="0.1"
+                  placeholder="例: 12.5"
+                  className="w-full border-2 border-gray-300 rounded px-3 py-2 font-bold focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {actualRate !== null && (
+                <div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-300">
+                  <div className="text-sm text-gray-600 mb-1">真の出麹歩合</div>
+                  <div className="text-3xl font-bold text-yellow-700">{actualRate.toFixed(1)} %</div>
+                </div>
+              )}
+
+              <button
+                onClick={handleSave}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition text-lg"
+              >
+                💾 保存
+              </button>
             </div>
           </div>
         </div>

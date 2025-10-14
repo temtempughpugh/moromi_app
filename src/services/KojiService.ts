@@ -19,20 +19,20 @@ export class KojiService {
   // 保管方法の判定
   // ============================================
   static determineStorageType(
-    kojiDekojiDate: string,
-    kakeShikomiDate: string | null
-  ): string | null {
-    if (!kakeShikomiDate) return null;
-    
-    const dekoji = new Date(kojiDekojiDate);
-    const shikomi = new Date(kakeShikomiDate);
-    const daysDiff = Math.floor((shikomi.getTime() - dekoji.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (daysDiff === 1) return null;        // 通常
-    if (daysDiff === 2) return '冷蔵';
-    if (daysDiff >= 3) return '冷凍';
-    return null;
-  }
+  kojiDekojiDate: string,
+  kakeShikomiDate: string | null
+): string | null {
+  if (!kakeShikomiDate) return null;
+  
+  const dekoji = new Date(kojiDekojiDate);
+  const shikomi = new Date(kakeShikomiDate);
+  const daysDiff = Math.floor((shikomi.getTime() - dekoji.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff === 1) return null;              // 通常（出麹翌日に仕込み）
+  if (daysDiff === 2 || daysDiff === 3) return '冷蔵';  // 出麹2〜3日後に仕込み
+  if (daysDiff >= 4) return '冷凍';             // 出麹4日後以降に仕込み
+  return null;
+}
 
   // ============================================
   // 出麹配分計算
