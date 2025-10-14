@@ -75,6 +75,7 @@ export async function parseCSV(file: File): Promise<{ moromiData: MoromiData[], 
             methodCategory: row['製法区分'] || null,
             josoDate: dateToString(excelSerialToDate(parseInt(row['上槽予定']))),
             tankNo: row['タンク番号'],
+            soeTankId: null,  // ← この行を追加
             memo: row['備考'] || null,
             motoOroshiDate: dateToString(new Date(tomeDate.getTime() - 4 * 24 * 60 * 60 * 1000)),
             soeShikomiDate: dateToString(new Date(tomeDate.getTime() - 3 * 24 * 60 * 60 * 1000)),
