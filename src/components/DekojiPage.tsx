@@ -20,104 +20,128 @@ export default function DekojiPage({ dataContext, dekojiDate, onBack }: DekojiPa
   const [totalRiceWeight, setTotalRiceWeight] = useState(0);
   const [totalSheetCount, setTotalSheetCount] = useState(0);
 
-  useEffect(() => {
-    if (!dekojiDate || !dataContext.moromiProcesses) return;
+  const [isInitialized, setIsInitialized] = useState(false);
+const [isSaving, setIsSaving] = useState(false);
 
-    const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-      p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+useEffect(() => {
+  if (!dekojiDate || !dataContext.moromiProcesses || isInitialized) return;
+
+  const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+  );
+
+  if (dekojiProcesses.length === 0) {
+    alert('この日の出麹作業はありません');
+    onBack();
+    return;
+  }
+
+  // 既存データから出麹歩合を読み込む
+  const savedRate = dekojiProcesses[0]?.predictedDekojiRate;
+  if (savedRate && savedRate > 0) {
+    setDekojiRate(savedRate);
+  }
+
+  // 既存データから最後の1枚の重量を読み込む
+  const savedWeight = dekojiProcesses[0]?.lastSheetWeight;
+  if (savedWeight && savedWeight > 0) {
+    setLastSheetWeight(savedWeight.toString());
+  }
+
+  // 既存データから真の出麹歩合を読み込む
+  const savedActualRate = dekojiProcesses[0]?.actualDekojiRate;
+  if (savedActualRate && savedActualRate > 0) {
+    setActualRate(savedActualRate);
+  }
+
+  // 対応する掛米工程を取得
+  const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
+  const kakeProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    jungoIds.includes(p.jungoId) && 
+    (p.processType === 'motoKake' || 
+     p.processType === 'soeKake' || 
+     p.processType === 'nakaKake' || 
+     p.processType === 'tomeKake')
+  );
+
+  calculateAll([...dekojiProcesses, ...kakeProcesses], savedRate || dekojiRate);
+  setIsInitialized(true);
+}, [dekojiDate, dataContext.moromiProcesses, isInitialized]);
+const calculateAll = (processes: MoromiProcess[], rate: number) => {
+  const calculatedLots = KojiService.calculateDistribution(processes, rate);
+  const calculatedDistribution = KojiService.calculateShelfDistribution(calculatedLots);
+
+  setLots(calculatedLots);
+  setDistribution(calculatedDistribution);
+
+  const totalRice = calculatedLots.reduce((sum, lot) => sum + lot.riceWeight, 0);
+  const totalSheets = calculatedLots.reduce((sum, lot) => sum + lot.sheetCount, 0);
+  setTotalRiceWeight(totalRice);
+  setTotalSheetCount(totalSheets);
+};
+
+const handleDekojiRateChange = (value: number) => {
+  setDekojiRate(value);
+  if (!dekojiDate || !dataContext.moromiProcesses) return;
+
+  const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+  );
+
+  // 対応する掛米工程を取得
+  const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
+  const kakeProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    jungoIds.includes(p.jungoId) && 
+    (p.processType === 'motoKake' || 
+     p.processType === 'soeKake' || 
+     p.processType === 'nakaKake' || 
+     p.processType === 'tomeKake')
+  );
+
+  calculateAll([...dekojiProcesses, ...kakeProcesses], value);
+};
+
+const handleLastSheetWeightChange = (value: string) => {
+  setLastSheetWeight(value);
+  const weight = parseFloat(value);
+  if (!isNaN(weight) && weight > 0) {
+    const calculated = KojiService.calculateActualDekojiRate(totalRiceWeight, dekojiRate, weight);
+    setActualRate(calculated);
+  } else {
+    setActualRate(null);
+  }
+};
+
+const handleSave = async () => {
+  if (!dekojiDate || isSaving) return;
+
+  try {
+    setIsSaving(true);
+    const weight = parseFloat(lastSheetWeight);
+    const rate = actualRate;
+
+    const updatedProcesses = lots.flatMap(lot =>
+      lot.processes.map(p => ({
+        ...p,
+        predictedDekojiRate: dekojiRate,
+        lastSheetWeight: weight || undefined,
+        actualDekojiRate: rate || undefined,
+        storageType: lot.storageType
+      }))
     );
 
-    if (dekojiProcesses.length === 0) {
-      alert('この日の出麹作業はありません');
-      onBack();
-      return;
-    }
+    await updateDekojiData(updatedProcesses);
+    await dataContext.loadMoromiByBY(dataContext.currentBY);
 
-    // 対応する掛米工程を取得
-    const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
-    const kakeProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-      jungoIds.includes(p.jungoId) && 
-      (p.processType === 'motoKake' || 
-       p.processType === 'soeKake' || 
-       p.processType === 'nakaKake' || 
-       p.processType === 'tomeKake')
-    );
-
-    calculateAll([...dekojiProcesses, ...kakeProcesses], dekojiRate);
-  }, [dekojiDate, dataContext.moromiProcesses]);
-
-  const calculateAll = (processes: MoromiProcess[], rate: number) => {
-    const calculatedLots = KojiService.calculateDistribution(processes, rate);
-    const calculatedDistribution = KojiService.calculateShelfDistribution(calculatedLots);
-
-    setLots(calculatedLots);
-    setDistribution(calculatedDistribution);
-
-    const totalRice = calculatedLots.reduce((sum, lot) => sum + lot.riceWeight, 0);
-    const totalSheets = calculatedLots.reduce((sum, lot) => sum + lot.sheetCount, 0);
-    setTotalRiceWeight(totalRice);
-    setTotalSheetCount(totalSheets);
-  };
-
-  const handleDekojiRateChange = (value: number) => {
-    setDekojiRate(value);
-    if (!dekojiDate || !dataContext.moromiProcesses) return;
-
-    const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-      p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
-    );
-
-    // 対応する掛米工程を取得
-    const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
-    const kakeProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-      jungoIds.includes(p.jungoId) && 
-      (p.processType === 'motoKake' || 
-       p.processType === 'soeKake' || 
-       p.processType === 'nakaKake' || 
-       p.processType === 'tomeKake')
-    );
-
-    calculateAll([...dekojiProcesses, ...kakeProcesses], value);
-  };
-
-  const handleLastSheetWeightChange = (value: string) => {
-    setLastSheetWeight(value);
-    const weight = parseFloat(value);
-    if (!isNaN(weight) && weight > 0) {
-      const calculated = KojiService.calculateActualDekojiRate(totalRiceWeight, dekojiRate, weight);
-      setActualRate(calculated);
-    } else {
-      setActualRate(null);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!dekojiDate) return;
-
-    try {
-      const weight = parseFloat(lastSheetWeight);
-      const rate = actualRate;
-
-      const updatedProcesses = lots.flatMap(lot =>
-        lot.processes.map(p => ({
-          ...p,
-          predictedDekojiRate: dekojiRate,
-          lastSheetWeight: weight || undefined,
-          actualDekojiRate: rate || undefined,
-          storageType: lot.storageType
-        }))
-      );
-
-      await updateDekojiData(updatedProcesses);
-      await dataContext.loadMoromiByBY(dataContext.currentBY);
-
-      alert('保存しました');
-      onBack();
-    } catch (error) {
-      console.error('保存エラー:', error);
-      alert('保存に失敗しました');
-    }
-  };
+    alert('保存しました');
+    onBack();
+  } catch (error) {
+    console.error('保存エラー:', error);
+    alert('保存に失敗しました');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const getUsageColor = (usage: string): string => {
   if (usage === '酒母') return 'bg-red-200 border-red-400';
