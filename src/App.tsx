@@ -10,28 +10,30 @@ type Page = 'dashboard' | 'csv-update' | 'shift';
 export default function App() {
   const dataContext = useData();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+
+  // ↓ ここから追加
+  // スワイプによるブラウザバックを防止（横スクロールは維持）
   useEffect(() => {
-    console.log('useEffect実行されました');
-    
     const preventSwipeBack = (e: WheelEvent) => {
-      console.log('wheel event発火');
-      console.log('deltaX:', e.deltaX, 'deltaY:', e.deltaY);
-      
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && e.deltaX < 0) {
-        console.log('左スクロール検知');
-        e.preventDefault();
+      // 横スクロールの場合のみ処理
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const target = e.target as HTMLElement;
+        const scrollableParent = target.closest('[style*="overflow"]') || document.documentElement;
+        
+        // スクロール位置が左端（0付近）で左にスクロールしようとしている場合のみ防止
+        if (e.deltaX < 0 && scrollableParent.scrollLeft <= 1) {
+          e.preventDefault();
+        }
       }
     };
 
-    console.log('addEventListener登録開始');
     window.addEventListener('wheel', preventSwipeBack, { passive: false });
-    console.log('addEventListener登録完了');
-    
+
     return () => {
-      console.log('cleanup実行');
       window.removeEventListener('wheel', preventSwipeBack);
     };
   }, []);
+  // ↑ ここまで追加
 
   if (dataContext.isLoading) {
     return (

@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  overscroll-behavior-x: none;
+}
+
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;
