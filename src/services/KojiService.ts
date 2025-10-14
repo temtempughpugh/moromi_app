@@ -38,13 +38,13 @@ export class KojiService {
   // 出麹配分計算
   // ============================================
   static calculateDistribution(
-    processes: MoromiProcess[],
-    dekojiRate: number = 120
-  ): DekojiLot[] {
-    // 麹工程のみフィルタ
-    const kojiProcesses = processes.filter(p => 
-      p.processType?.includes('Koji') && p.amount && p.amount > 0
-    );
+  processes: MoromiProcess[],  // ← この引数は全工程を含むべき
+  dekojiRate: number = 120
+): DekojiLot[] {
+  // 麹工程のみフィルタ
+  const kojiProcesses = processes.filter(p => 
+    p.processType?.includes('Koji') && p.amount && p.amount > 0
+  );
 
     // 用途・順号でグループ化
     const grouped = new Map<string, MoromiProcess[]>();
@@ -79,10 +79,10 @@ export class KojiService {
 
         // 全processesから対応する掛米工程を探す
         const kakeProcess = processes.find(p => 
-          p.by === kojiProcess.by && 
-          p.jungoId === kojiProcess.jungoId && 
-          p.processType === kakeProcessType
-        );
+      p.by === kojiProcess.by && 
+      p.jungoId === kojiProcess.jungoId && 
+      p.processType === kakeProcessType
+    );
 
         if (kakeProcess && kakeProcess.kakeShikomiDate) {
           storageType = this.determineStorageType(kojiProcess.dekojiDate, kakeProcess.kakeShikomiDate);

@@ -21,20 +21,26 @@ export default function DekojiPage({ dataContext, dekojiDate, onBack }: DekojiPa
   const [totalSheetCount, setTotalSheetCount] = useState(0);
 
   useEffect(() => {
-    if (!dekojiDate || !dataContext.moromiProcesses) return;
+  if (!dekojiDate || !dataContext.moromiProcesses) return;
 
-    const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-      p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
-    );
+  const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+  );
 
-    if (dekojiProcesses.length === 0) {
-      alert('この日の出麹作業はありません');
-      onBack();
-      return;
-    }
+  if (dekojiProcesses.length === 0) {
+    alert('この日の出麹作業はありません');
+    onBack();
+    return;
+  }
 
-    calculateAll(dekojiProcesses, dekojiRate);
-  }, [dekojiDate, dataContext.moromiProcesses]);
+  // ✅ 出麹する順号の全工程を取得
+const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
+const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+  jungoIds.includes(p.jungoId)
+);
+
+  calculateAll(allRelatedProcesses, dekojiRate);
+}, [dekojiDate, dataContext.moromiProcesses]);
 
   const calculateAll = (processes: MoromiProcess[], rate: number) => {
     const calculatedLots = KojiService.calculateDistribution(processes, rate);
@@ -50,15 +56,21 @@ export default function DekojiPage({ dataContext, dekojiDate, onBack }: DekojiPa
   };
 
   const handleDekojiRateChange = (value: number) => {
-    setDekojiRate(value);
-    if (!dekojiDate || !dataContext.moromiProcesses) return;
+  setDekojiRate(value);
+  if (!dekojiDate || !dataContext.moromiProcesses) return;
 
-    const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
-      p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
-    );
+  const dekojiProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    p.dekojiDate === dekojiDate && p.processType?.includes('Koji')
+  );
 
-    calculateAll(dekojiProcesses, value);
-  };
+  // ✅ こちらも同じ修正
+  const jungoIds = [...new Set(dekojiProcesses.map((p: MoromiProcess) => p.jungoId))];
+  const allRelatedProcesses = dataContext.moromiProcesses.filter((p: MoromiProcess) =>
+    jungoIds.includes(p.jungoId)
+  );
+
+  calculateAll(allRelatedProcesses, value);
+};
 
   const handleLastSheetWeightChange = (value: string) => {
     setLastSheetWeight(value);
