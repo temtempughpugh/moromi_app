@@ -152,7 +152,7 @@ export default function DekojiPage({ dataContext, dekojiDate, onBack }: DekojiPa
         </div>
       </nav>
 
-      <div className="container mx-auto px-6 py-6">
+      <div className="w-full px-4 py-6">
         <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
           <div className="flex items-center gap-3">
             <span className="font-bold text-gray-700">出麹歩合：</span>

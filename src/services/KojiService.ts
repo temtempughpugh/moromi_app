@@ -139,23 +139,33 @@ export class KojiService {
     }
 
     // 4列使い切る調整
-    while (totalColumns < MAX_COLUMNS) {
-      // 最多枚数のロットを特定（出麹順序が遅い方優先）
-      let maxLot: DekojiLot | null = null;
-      for (let i = lots.length - 1; i >= 0; i--) {
-        if (!maxLot || lots[i].sheetCount >= maxLot.sheetCount) {
-          maxLot = lots[i];
-        }
-      }
+    // 4列使い切る調整
+while (totalColumns < MAX_COLUMNS) {
+  // 各ロットの列あたり枚数を仮計算
+  const lotSheetsPerColumn = lots.map(lot => {
+    const sheetsPerColumn = Math.floor(lot.sheetCount / lot.columns.length);
+    const remainder = lot.sheetCount % lot.columns.length;
+    // 各列の最大枚数（余りは最初の列に加算）
+    return remainder > 0 ? sheetsPerColumn + 1 : sheetsPerColumn;
+  });
 
-      if (maxLot) {
-        maxLot.columns.push('');
-        totalColumns++;
-      } else {
-        break;
-      }
+  // 列あたり最多枚数のロットを特定（出麹順序が遅い方優先）
+  let maxLot: DekojiLot | null = null;
+  let maxSheetsPerColumn = 0;
+  for (let i = lots.length - 1; i >= 0; i--) {
+    if (lotSheetsPerColumn[i] >= maxSheetsPerColumn) {
+      maxSheetsPerColumn = lotSheetsPerColumn[i];
+      maxLot = lots[i];
     }
+  }
 
+  if (maxLot) {
+    maxLot.columns.push('');
+    totalColumns++;
+  } else {
+    break;
+  }
+}
     // 列を割り当て（D→C→B→A）
     const columnNames = ['D', 'C', 'B', 'A'];
     let currentColumnIndex = 0;
@@ -166,6 +176,38 @@ export class KojiService {
         currentColumnIndex++;
       }
     });
+
+    lots.forEach(lot => {
+  const hasAColumn = lot.columns.includes('A');
+  
+  if (hasAColumn && lot.columns.length > 1) {
+    // 各列の枚数を計算
+    const sheetsPerColumn = Math.floor(lot.sheetCount / lot.columns.length);
+    const remainder = lot.sheetCount % lot.columns.length;
+    
+    // 各列の実際の枚数を計算
+    const columnSheets = lot.columns.map((col, index) => {
+      const sheets = index < remainder ? sheetsPerColumn + 1 : sheetsPerColumn;
+      return { col, sheets, index };
+    });
+    
+    // A列のインデックスを取得
+    const aIndex = lot.columns.indexOf('A');
+    
+    // 5段以上の列を探す（A列以外）
+    const fivePlusColumn = columnSheets.find(
+      (item, idx) => item.sheets >= 5 && idx !== aIndex
+    );
+    
+    // 5段以上の列が見つかった場合、A列と入れ替え
+    if (fivePlusColumn) {
+      const targetIndex = fivePlusColumn.index;
+      // 列名を入れ替え
+      [lot.columns[aIndex], lot.columns[targetIndex]] = 
+        [lot.columns[targetIndex], lot.columns[aIndex]];
+    }
+  }
+});
 
     // マトリックス構築
     const matrix: ShelfCell[][] = [];
