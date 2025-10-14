@@ -72,6 +72,7 @@ export function useData() {
       }
     } catch (error) {
       console.error('データ読み込みエラー:', error);
+console.error('エラー詳細:', JSON.stringify(error, null, 2));
       alert('データの読み込みに失敗しました');
     } finally {
       setIsLoading(false);

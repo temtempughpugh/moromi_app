@@ -51,7 +51,7 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
       actual_dekoji_rate: p.actualDekojiRate,
       storage_type: p.storageType,
       updated_at: new Date().toISOString()
-    })), { onConflict: 'by,jungo_id,process_type' });
+    })), { onConflict: 'by,jungo_id,process_type,rice_type' });
 
   if (processError) throw processError;
 }
@@ -77,7 +77,7 @@ export async function updateDekojiData(processes: MoromiProcess[]): Promise<void
       actual_dekoji_rate: p.actualDekojiRate,
       storage_type: p.storageType,
       updated_at: new Date().toISOString()
-    })), { onConflict: 'by,jungo_id,process_type' });
+    })), { onConflict: 'by,jungo_id,process_type,rice_type' });
 
   if (error) throw error;
 }

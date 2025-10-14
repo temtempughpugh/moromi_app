@@ -698,7 +698,7 @@ async function handleSoeTankChange(by: number, jungoId: string, soeTankId: strin
                                 </thead>
                                 <tbody>
                                   {processes[moromi.jungoId]?.map((process: MoromiProcess) => (
-                                    <tr key={`${process.processType}-${process.senmaiDate}`} className="border-b">
+                                    <tr key={`${process.processType}-${process.riceType}-${process.senmaiDate}`} className="border-b">
                                       <td className="px-2 py-1">{getProcessName(process.processType)}</td>
                                       <td className="px-2 py-1">{process.riceType}</td>
                                       <td className="px-2 py-1">{process.polishingRatio}%</td>

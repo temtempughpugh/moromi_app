@@ -48,35 +48,67 @@ export function convertProcessType(csvValue: string): ProcessType {
 }
 
 // CSV読み込み
+// CSV読み込み
 export async function parseCSV(file: File): Promise<{ moromiData: MoromiData[], moromiProcesses: MoromiProcess[] }> {
   return new Promise((resolve, reject) => {
-    Papa.parse<any>(file, {  // ← <any> を追加
+    Papa.parse<any>(file, {
       header: true,
-      skipEmptyLines: true,
+      skipEmptyLines: false,  // 空行も取得するように変更
       complete: (results) => {
         const moromiDataList: MoromiData[] = [];
         const moromiProcessList: MoromiProcess[] = [];
-
+        
+        // Step 1: 順号ごとにグループ化
+        const rowsByJungo = new Map<string, any[]>();
+        let currentJungoId: string | null = null;
+        
         results.data.forEach((row: any) => {
-          // 順号が空欄ならスキップ
-          if (!row['順号'] || row['順号'].toString().trim() === '') return;
-
-          const jungoId = row['順号'].toString();
-          const tomeDate = excelSerialToDate(parseInt(row['留日']));
+          // 順号が入っていたら更新
+          if (row['順号'] && row['順号'].toString().trim() !== '') {
+            currentJungoId = row['順号'].toString();
+          }
+          
+          // 順号が一度も設定されていない場合はスキップ
+          if (!currentJungoId) return;
+          
+          // 使用区分が1つでもあれば有効な行
+          let hasValidData = false;
+          for (let i = 0; i < 9; i++) {
+            const usageKey = i === 0 ? '使用区分' : `使用区分_${i}`;
+            if (row[usageKey] && row[usageKey].toString().trim() !== '') {
+              hasValidData = true;
+              break;
+            }
+          }
+          
+          if (!hasValidData) return;
+          
+          // グループに追加
+          if (!rowsByJungo.has(currentJungoId)) {
+            rowsByJungo.set(currentJungoId, []);
+          }
+          rowsByJungo.get(currentJungoId)!.push(row);
+        });
+        
+        // Step 2: 各順号グループを処理
+        rowsByJungo.forEach((rows, jungoId) => {
+          // 最初の行から基本情報を取得（moromi_data作成）
+          const firstRow = rows[0];
+          
+          const tomeDate = excelSerialToDate(parseInt(firstRow['留日']));
           const by = calculateBY(tomeDate);
 
-          // moromi_data作成
           const moromiData: MoromiData = {
             by,
             jungoId,
-            brewingSize: parseInt(row['仕込規模']),
+            brewingSize: parseInt(firstRow['仕込規模']),
             tomeDate: dateToString(tomeDate),
-            brewingCategory: row['仕込区分'],
-            methodCategory: row['製法区分'] || null,
-            josoDate: dateToString(excelSerialToDate(parseInt(row['上槽予定']))),
-            tankNo: row['タンク番号'],
-            soeTankId: null,  // ← この行を追加
-            memo: row['備考'] || null,
+            brewingCategory: firstRow['仕込区分'],
+            methodCategory: firstRow['製法区分'] || null,
+            josoDate: dateToString(excelSerialToDate(parseInt(firstRow['上槽予定']))),
+            tankNo: firstRow['タンク番号'],
+            soeTankId: null,
+            memo: firstRow['備考'] || null,
             motoOroshiDate: dateToString(new Date(tomeDate.getTime() - 4 * 24 * 60 * 60 * 1000)),
             soeShikomiDate: dateToString(new Date(tomeDate.getTime() - 3 * 24 * 60 * 60 * 1000)),
             uchikomiDate: dateToString(new Date(tomeDate.getTime() - 2 * 24 * 60 * 60 * 1000)),
@@ -85,71 +117,101 @@ export async function parseCSV(file: File): Promise<{ moromiData: MoromiData[], 
             yodanShikomiDate: null,
           };
 
-          // 四段があるか確認
-          for (let i = 0; i < 9; i++) {
-            const usageKey = i === 0 ? '使用区分' : `使用区分_${i}`;
-            if (row[usageKey] === '四段') {
-              const josoDate = excelSerialToDate(parseInt(row['上槽予定']));
-              moromiData.yodanShikomiDate = dateToString(new Date(josoDate.getTime() - 1 * 24 * 60 * 60 * 1000));
-              break;
+          // 四段があるか確認（全行をチェック）
+          for (const row of rows) {
+            for (let i = 0; i < 9; i++) {
+              const usageKey = i === 0 ? '使用区分' : `使用区分_${i}`;
+              if (row[usageKey] === '四段') {
+                const josoDate = excelSerialToDate(parseInt(firstRow['上槽予定']));
+                moromiData.yodanShikomiDate = dateToString(new Date(josoDate.getTime() - 1 * 24 * 60 * 60 * 1000));
+                break;
+              }
             }
+            if (moromiData.yodanShikomiDate) break;
           }
 
           moromiDataList.push(moromiData);
 
-          // moromi_process作成（9工程）
-          for (let i = 0; i < 9; i++) {
-            const usageKey = i === 0 ? '使用区分' : `使用区分_${i}`;
-            const dateKey = i === 0 ? '日付' : `日付_${i}`;
-            const riceKey = i === 0 ? '白米品種' : `白米品種_${i}`;
-            const pctKey = i === 0 ? '精米歩合' : `精米歩合_${i}`;
-            const amountKey = i === 0 ? '数量' : `数量_${i}`;
+          // Step 3: 全ての行から工程データを抽出（moromi_process作成）
+          rows.forEach((row) => {
+            for (let i = 0; i < 9; i++) {
+              const usageKey = i === 0 ? '使用区分' : `使用区分_${i}`;
+              const dateKey = i === 0 ? '日付' : `日付_${i}`;
+              const riceKey = i === 0 ? '白米品種' : `白米品種_${i}`;
+              const pctKey = i === 0 ? '精米歩合' : `精米歩合_${i}`;
+              const amountKey = i === 0 ? '数量' : `数量_${i}`;
 
-            if (!row[usageKey]) continue;
+              if (!row[usageKey]) continue;
 
-            const amount = row[amountKey] ? parseFloat(row[amountKey]) : null;
-            // 数量が0ならスキップ
-            if (amount === 0) continue;
+              const amount = row[amountKey] ? parseFloat(row[amountKey]) : null;
+              // 数量が0ならスキップ
+              if (amount === 0) continue;
 
-            const processType = convertProcessType(row[usageKey]);
-            const senmaiDate = excelSerialToDate(parseInt(row[dateKey]));
-            const senmaiDateStr = dateToString(senmaiDate);
+              const processType = convertProcessType(row[usageKey]);
+              const senmaiDate = excelSerialToDate(parseInt(row[dateKey]));
+              const senmaiDateStr = dateToString(senmaiDate);
 
-            const isKoji = processType.includes('Koji');
-            const isKake = processType.includes('Kake') || processType === 'yodan';
+              const isKoji = processType.includes('Koji');
+              const isKake = processType.includes('Kake') || processType === 'yodan';
 
-            const process: MoromiProcess = {
-              by,
-              jungoId,
-              processType,
-              senmaiDate: senmaiDateStr,
-              riceType: row[riceKey],
-              polishingRatio: parseInt(row[pctKey]),
-              amount,
-              hikomiDate: isKoji ? dateToString(new Date(senmaiDate.getTime() + 1 * 24 * 60 * 60 * 1000)) : null,
-              moriDate: isKoji ? dateToString(new Date(senmaiDate.getTime() + 2 * 24 * 60 * 60 * 1000)) : null,
-              dekojiDate: isKoji ? dateToString(new Date(senmaiDate.getTime() + 3 * 24 * 60 * 60 * 1000)) : null,
-              kakeShikomiDate: isKake ? dateToString(new Date(senmaiDate.getTime() + 1 * 24 * 60 * 60 * 1000)) : null,
-              shikomiDate: '',
-            };
+              const process: MoromiProcess = {
+                by,
+                jungoId,
+                processType,
+                senmaiDate: senmaiDateStr,
+                riceType: row[riceKey],
+                polishingRatio: parseInt(row[pctKey]),
+                amount,
+                hikomiDate: isKoji ? dateToString(new Date(senmaiDate.getTime() + 1 * 24 * 60 * 60 * 1000)) : null,
+                moriDate: isKoji ? dateToString(new Date(senmaiDate.getTime() + 2 * 24 * 60 * 60 * 1000)) : null,
+                dekojiDate: isKoji ? dateToString(new Date(senmaiDate.getTime() + 3 * 24 * 60 * 60 * 1000)) : null,
+                kakeShikomiDate: isKake ? dateToString(new Date(senmaiDate.getTime() + 1 * 24 * 60 * 60 * 1000)) : null,
+                shikomiDate: '',
+              };
 
-            // 仕込み日を設定
-            if (processType === 'motoKoji' || processType === 'motoKake') {
-              process.shikomiDate = moromiData.motoOroshiDate;
-            } else if (processType === 'soeKoji' || processType === 'soeKake') {
-              process.shikomiDate = moromiData.soeShikomiDate;
-            } else if (processType === 'nakaKoji' || processType === 'nakaKake') {
-              process.shikomiDate = moromiData.nakaShikomiDate;
-            } else if (processType === 'tomeKoji' || processType === 'tomeKake') {
-              process.shikomiDate = moromiData.tomeShikomiDate;
-            } else if (processType === 'yodan') {
-              process.shikomiDate = moromiData.yodanShikomiDate || '';
+              // 仕込み日を設定
+              if (processType === 'motoKoji' || processType === 'motoKake') {
+                process.shikomiDate = moromiData.motoOroshiDate;
+              } else if (processType === 'soeKoji' || processType === 'soeKake') {
+                process.shikomiDate = moromiData.soeShikomiDate;
+              } else if (processType === 'nakaKoji' || processType === 'nakaKake') {
+                process.shikomiDate = moromiData.nakaShikomiDate;
+              } else if (processType === 'tomeKoji' || processType === 'tomeKake') {
+                process.shikomiDate = moromiData.tomeShikomiDate;
+              } else if (processType === 'yodan') {
+                process.shikomiDate = moromiData.yodanShikomiDate || '';
+              }
+
+              // 重複チェック: 同じ (by, jungoId, processType, riceType) が既に存在するか
+              const existingIndex = moromiProcessList.findIndex(p => 
+                p.by === process.by &&
+                p.jungoId === process.jungoId &&
+                p.processType === process.processType &&
+                p.riceType === process.riceType
+              );
+              
+              if (existingIndex !== -1) {
+                // 既に存在する場合は数量を合算
+                const existing = moromiProcessList[existingIndex];
+                moromiProcessList[existingIndex] = {
+                  ...existing,
+                  amount: (existing.amount || 0) + (process.amount || 0)
+                };
+                console.log(`数量合算: ${process.jungoId} ${processType} ${process.riceType}: ${existing.amount} + ${process.amount} = ${moromiProcessList[existingIndex].amount}`);
+              } else {
+                moromiProcessList.push(process);
+              }
             }
-
-            moromiProcessList.push(process);
-          }
+          });
         });
 
+        console.log('===== CSV解析結果 =====');
+        console.log('moromiData件数:', moromiDataList.length);
+        console.log('moromiProcess件数:', moromiProcessList.length);
+        console.log('最初のmoromiData:', moromiDataList[0]);
+        console.log('最初の3件のmoromiProcess:', moromiProcessList.slice(0, 3));
+        console.log('順号3の工程データ:', moromiProcessList.filter(p => p.jungoId === '3'));
+        
         resolve({ moromiData: moromiDataList, moromiProcesses: moromiProcessList });
       },
       error: reject,

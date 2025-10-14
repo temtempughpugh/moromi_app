@@ -118,10 +118,11 @@ export default function CSVUpdate({ getAllData, saveMoromiData }: CSVUpdateProps
       const finalProcesses = [
         ...keptProcesses.filter(kept =>
           !updatedProcesses.some(updated =>
-            updated.by === kept.by && 
-            updated.jungoId === kept.jungoId && 
-            updated.processType === kept.processType
-          )
+  updated.by === kept.by && 
+  updated.jungoId === kept.jungoId && 
+  updated.processType === kept.processType &&
+  updated.riceType === kept.riceType
+)
         ),
         ...updatedProcesses
       ];
