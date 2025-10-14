@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import CSVUpdate from './components/CSVUpdate';
 import ShiftCalendar from './components/ShiftCalendar';
-import StaffManagement from './components/StaffManagement';
 import DekojiPage from './components/DekojiPage';
 import { useData } from './hooks/useData';
 

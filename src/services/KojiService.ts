@@ -58,7 +58,7 @@ export class KojiService {
 
     // ロット作成
     const lots: DekojiLot[] = [];
-    grouped.forEach((procs, key) => {
+    grouped.forEach((procs) => {
       const jungoId = procs[0].jungoId;
       const usage = this.getUsage(procs[0].processType);
       const riceWeight = procs.reduce((sum, p) => sum + (p.amount || 0), 0);
