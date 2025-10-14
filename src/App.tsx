@@ -133,6 +133,9 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
   moromiData={dataContext.moromiData}
   moromiProcesses={dataContext.moromiProcesses}
   getProcessesByMoromi={dataContext.getProcessesByMoromi}
+  saveMoromiData={dataContext.saveMoromiData}
+  loadMoromiByBY={dataContext.loadMoromiByBY}
+  currentBY={dataContext.currentBY}
 />
           </>
         )}

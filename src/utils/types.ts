@@ -8,6 +8,7 @@ export interface MoromiData {
   methodCategory: string | null;
   josoDate: string;
   tankNo: string;
+  soeTankId: string | null;
   memo: string | null;
   motoOroshiDate: string;
   soeShikomiDate: string;

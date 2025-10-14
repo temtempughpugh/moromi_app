@@ -204,6 +204,7 @@ const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) 
     getProcessesByMoromi,
     getAllData,
     saveMoromiData,
+    loadMoromiByBY,  // ← 追加
   staffList,
     shifts,
     monthlySettings,

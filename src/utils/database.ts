@@ -16,6 +16,7 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
       method_category: m.methodCategory,
       joso_date: m.josoDate,
       tank_no: m.tankNo,
+      soe_tank_id: m.soeTankId || null,  // ← この行を追加
       memo: m.memo,
       moto_oroshi_date: m.motoOroshiDate,
       soe_shikomi_date: m.soeShikomiDate,
@@ -106,6 +107,7 @@ export async function getMoromiByBY(by: number): Promise<MoromiData[]> {
       methodCategory: d.method_category,
       josoDate: d.joso_date,
       tankNo: d.tank_no,
+      soeTankId: d.soe_tank_id || null,  // ← この行を追加
       memo: d.memo,
       motoOroshiDate: d.moto_oroshi_date,
       soeShikomiDate: d.soe_shikomi_date,
@@ -171,6 +173,7 @@ export async function getAllData(): Promise<{ moromiData: MoromiData[], moromiPr
       methodCategory: d.method_category,
       josoDate: d.joso_date,
       tankNo: d.tank_no,
+      soeTankId: d.soe_tank_id || null,  // ← この行を追加
       memo: d.memo,
       motoOroshiDate: d.moto_oroshi_date,
       soeShikomiDate: d.soe_shikomi_date,
