@@ -165,7 +165,9 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
     saveRiceDelivery={dataContext.saveRiceDelivery}
     saveStaff={dataContext.saveStaff}
   deleteStaff={dataContext.deleteStaff}
-  />
+weeklyDuties={dataContext.weeklyDuties}
+  saveWeeklyDuties={dataContext.saveWeeklyDuties}
+/>
 )}
 
         {currentPage === 'csv-update' && (

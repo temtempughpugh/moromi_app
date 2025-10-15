@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { parseCSV } from '../utils/csvParser';
 import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty } from '../utils/database';
-import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask } from '../utils/types';  // ← TaskManagement, OverdueTask を追加
+import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty } from '../utils/types';
 import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 import {
   getAllStaff,
@@ -20,6 +19,9 @@ import {
   updateTask as dbUpdateTask,  // ← 追加
   deleteTask as dbDeleteTask,  // ← 追加
   getOverdueTasks,  // ← 追加
+  getWeeklyDuties,  // ← 追加
+  saveWeeklyDuties as saveWeeklyDutiesToSupabase,  // ← 追加
+  getCurrentDutyStaff,  // ← 追加
 } from '../utils/database';
 
 export function useData() {
@@ -39,8 +41,10 @@ export function useData() {
   });
 
   // タスク管理用state
+  // state追加（tasksの下に追加）
   const [tasks, setTasks] = useState<TaskManagement[]>([]);
   const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
+  const [weeklyDuties, setWeeklyDuties] = useState<WeeklyDuty[]>([]);  // ← 追加
 
   useEffect(() => {
     loadAllData();
@@ -70,25 +74,31 @@ export function useData() {
   }, []);
 
 
+  // 初期データ読み込み部分に追加（loadAllDataの中）
   const loadAllData = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-
       const isEmpty = await isDatabaseEmpty();
       if (isEmpty) {
-        await importFromLocalCSV();
       }
-
+      
       const bys = await getAvailableBYs();
       setAvailableBYs(bys);
+      
       if (bys.length > 0) {
         setCurrentBY(bys[0]);
+        await loadMoromiByBY(bys[0]);
       }
+      
+      await loadAllStaff();
+      await loadShiftsByMonth(currentShiftMonth);
+      await loadMonthlySettings(currentShiftMonth);
+      await loadMemoRow(currentShiftMonth);
+      await loadRiceDelivery(currentShiftMonth);
       await loadAllTasks();
+      await loadWeeklyDuties();  // ← 追加
     } catch (error) {
       console.error('データ読み込みエラー:', error);
-console.error('エラー詳細:', JSON.stringify(error, null, 2));
-      alert('データの読み込みに失敗しました');
     } finally {
       setIsLoading(false);
     }
@@ -117,22 +127,7 @@ console.error('エラー詳細:', JSON.stringify(error, null, 2));
   }
 };
 
-  const importFromLocalCSV = async () => {
-    try {
-      const response = await fetch('/data/Book1.csv');
-      const text = await response.text();
-      const blob = new Blob([text], { type: 'text/csv' });
-      const file = new File([blob], 'Book1.csv', { type: 'text/csv' });
 
-      const { moromiData, moromiProcesses } = await parseCSV(file);
-      await saveToSupabase(moromiData, moromiProcesses);
-
-      console.log(`初回CSV読み込み完了: もろみ${moromiData.length}件, 工程${moromiProcesses.length}件`);
-    } catch (error) {
-      console.error('CSV自動読み込みエラー:', error);
-      throw error;
-    }
-  };
 
   const saveMoromiData = async (moromiDataList: MoromiData[], processList: MoromiProcess[]) => {
     console.log('===== saveMoromiData 開始 =====');
@@ -254,6 +249,29 @@ const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) 
     }
   };
 
+    const loadWeeklyDuties = async () => {
+    try {
+      const data = await getWeeklyDuties();
+      setWeeklyDuties(data);
+    } catch (error) {
+      console.error('週番読み込みエラー:', error);
+    }
+  };
+
+  const saveWeeklyDuties = async (duties: Omit<WeeklyDuty, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+    try {
+      await saveWeeklyDutiesToSupabase(duties);
+      await loadWeeklyDuties();
+    } catch (error) {
+      console.error('週番保存エラー:', error);
+      throw error;
+    }
+  };
+
+  const getCurrentDuty = (targetDate: Date): Staff | null => {
+    return getCurrentDutyStaff(weeklyDuties, targetDate, staffList);
+  };
+
   return {
     isLoading,
     availableBYs,
@@ -285,5 +303,8 @@ const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) 
     updateTask,
     deleteTask,
     refreshTasks: loadAllTasks,
+    weeklyDuties,  // ← 追加
+    saveWeeklyDuties,  // ← 追加
+    getCurrentDuty,  // ← 追加
   };
 }

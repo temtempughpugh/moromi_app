@@ -486,6 +486,15 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
               </div>
             )}
           </button>
+           {/* 週番表示 */}
+          {(() => {
+            const currentDutyStaff = dataContext.getCurrentDuty(currentDate);
+            return currentDutyStaff ? (
+              <div className="bg-white/20 px-4 py-2 rounded-lg">
+                <span className="text-sm font-semibold">週番: {currentDutyStaff.name}</span>
+              </div>
+            ) : null;
+          })()}
           
           <button 
             onClick={() => changeDate(1)}

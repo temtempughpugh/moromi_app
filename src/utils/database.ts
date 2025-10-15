@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement } from './types';
+import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty } from './types';
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
@@ -561,4 +561,80 @@ export const getOverdueTasks = (tasks: TaskManagement[], currentDate: Date): imp
   });
   
   return overdueTasks.sort((a, b) => b.elapsedDays - a.elapsedDays);
+};
+
+// ============================================
+// 週番関連
+// ============================================
+
+export const getWeeklyDuties = async (): Promise<WeeklyDuty[]> => {
+  const { data, error } = await supabase
+    .from('weekly_duty')
+    .select('*')
+    .eq('is_active', true)
+    .order('order_number', { ascending: true });
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    id: row.id,
+    staffId: row.staff_id,
+    orderNumber: row.order_number,
+    baseDate: row.base_date,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const saveWeeklyDuties = async (duties: Omit<WeeklyDuty, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<void> => {
+  // 既存のデータを全て無効化
+  const { error: deactivateError } = await supabase
+    .from('weekly_duty')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('is_active', true);
+
+  if (deactivateError) throw deactivateError;
+
+  // 新しいデータを挿入
+  const { error: insertError } = await supabase
+    .from('weekly_duty')
+    .insert(
+      duties.map(duty => ({
+        staff_id: duty.staffId,
+        order_number: duty.orderNumber,
+        base_date: duty.baseDate,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }))
+    );
+
+  if (insertError) throw insertError;
+};
+
+// 指定された日付の当番を取得する関数
+export const getCurrentDutyStaff = (
+  duties: WeeklyDuty[],
+  targetDate: Date,
+  staffList: Staff[]
+): Staff | null => {
+  if (duties.length === 0 || staffList.length === 0) return null;
+
+  // 基準日を取得（最初の当番の基準日）
+  const baseDate = new Date(duties[0].baseDate);
+  baseDate.setHours(0, 0, 0, 0);
+
+  const target = new Date(targetDate);
+  target.setHours(0, 0, 0, 0);
+
+  // 基準日からの経過週数を計算
+  const diffTime = target.getTime() - baseDate.getTime();
+  const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+
+  // 当番のインデックスを計算（循環）
+  const dutyIndex = diffWeeks % duties.length;
+  const currentDuty = duties[dutyIndex];
+
+  // スタッフを検索
+  return staffList.find(s => s.id === currentDuty.staffId) || null;
 };

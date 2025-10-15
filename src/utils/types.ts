@@ -152,3 +152,14 @@ export interface OverdueTask {
   cycleDays: number;
   elapsedDays: number;
 }
+
+// 週番設定
+export interface WeeklyDuty {
+  id: number;
+  staffId: string;
+  orderNumber: number;
+  baseDate: string; // YYYY-MM-DD形式
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
