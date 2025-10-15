@@ -215,18 +215,32 @@ if (isSameDate(moromi.uchikomiDate, currentDate)) {
   });
 
   // 4. 検定タンク変更
+  // 4. 検定タンク変更
   const todayJoso = moromiData.filter(m => isSameDate(m.josoDate, currentDate));
   
   if (todayJoso.length > 0) {
-    const previousJoso = moromiData
-      .filter(m => new Date(m.josoDate) < currentDate)
-      .sort((a, b) => new Date(b.josoDate).getTime() - new Date(a.josoDate).getTime())[0];
+    // 上槽日でソート（昇順）
+    const sortedTodayJoso = todayJoso.sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId));
     
-    if (previousJoso && previousJoso.kenteiTankId && todayJoso[0].kenteiTankId) {
-      if (previousJoso.kenteiTankId !== todayJoso[0].kenteiTankId) {
+    // 本日の最初の上槽
+    const firstTodayJoso = sortedTodayJoso[0];
+    
+    if (firstTodayJoso?.kenteiTankId) {
+      // 直近の過去の上槽を取得
+      const previousJoso = moromiData
+        .filter(m => {
+          const josoDate = new Date(m.josoDate);
+          josoDate.setHours(0, 0, 0, 0);
+          const current = new Date(currentDate);
+          current.setHours(0, 0, 0, 0);
+          return josoDate < current && m.kenteiTankId;
+        })
+        .sort((a, b) => new Date(b.josoDate).getTime() - new Date(a.josoDate).getTime())[0];
+      
+      if (previousJoso?.kenteiTankId && previousJoso.kenteiTankId !== firstTodayJoso.kenteiTankId) {
         tasks.kenteiChange.push({
           prev: previousJoso.kenteiTankId,
-          current: todayJoso[0].kenteiTankId
+          current: firstTodayJoso.kenteiTankId
         });
       }
     }
@@ -838,24 +852,40 @@ return (
         </div>
       )}
       
-      {/* 検定タンク変更 */}
-      {todayTasks.kenteiChange.length > 0 && (
+      {/* マット洗い */}
+      {todayTasks.matWash.length > 0 && (
         <div className="mb-4">
-          <h4 className="text-sm font-bold mb-2 text-gray-700">🔄 検定タンク変更</h4>
+          <h4 className="text-sm font-bold mb-2 text-gray-700">🧽 マット洗い</h4>
           <div className="space-y-1">
-            {todayTasks.kenteiChange.map((change, index) => (
-              <div key={index} className="bg-yellow-50 p-2 rounded border border-yellow-200 text-sm">
-                <span className="font-bold text-orange-600">
-                  No.{change.prev} → No.{change.current}
-                </span>
+            {todayTasks.matWash.map((task, index) => (
+              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                <span className="font-bold text-blue-600">{task.jungoId}号:</span>
+                <span className="ml-2 text-gray-700">No.{task.tankNo}</span>
               </div>
             ))}
           </div>
         </div>
       )}
       
+      {/* 検定タンク変更 */}
+{todayTasks.kenteiChange.length > 0 && (
+  <div className="mb-4">
+    <h4 className="text-sm font-bold mb-2 text-gray-700">🔄 検定タンク変更</h4>
+    <div className="space-y-1">
+      {todayTasks.kenteiChange.map((change, index) => (
+        <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+          <span className="font-bold text-orange-600">
+            No.{change.prev} → No.{change.current}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+      
       {todayTasks.tankWash.length === 0 && 
        todayTasks.tankHotWater.length === 0 && 
+       todayTasks.matWash.length === 0 && 
        todayTasks.kenteiChange.length === 0 && (
         <div className="text-center py-4 text-gray-400 text-sm">
           本日のタスクはありません
