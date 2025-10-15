@@ -16,7 +16,8 @@ interface DashboardProps {
 interface TodayTask {
   jungoId: string;
   tankNo?: string;
-  soeTankId?: string | null;  // ← 追加
+  soeTankId?: string | null;
+  kenteiTankId?: string | null;  // ← この行を追加
   processType?: string;
   riceType?: string;
   amount?: number;
@@ -83,13 +84,14 @@ if (isSameDate(moromi.uchikomiDate, currentDate)) {
 }
 
       if (isSameDate(moromi.josoDate, currentDate)) {
-        tasks.joso.push({
-          jungoId: moromi.jungoId,
-          tankNo: moromi.tankNo,
-          brewingCategory: moromi.brewingCategory,
-          brewingSize: moromi.brewingSize
-        });
-      }
+  tasks.joso.push({
+    jungoId: moromi.jungoId,
+    tankNo: moromi.tankNo,
+    kenteiTankId: moromi.kenteiTankId,  // ← この行を追加
+    brewingCategory: moromi.brewingCategory,
+    brewingSize: moromi.brewingSize
+  });
+}
 
       moromiProcessList.forEach((process: MoromiProcess) => {
         if (process.moriDate && isSameDate(process.moriDate, currentDate)) {
@@ -686,27 +688,29 @@ return (
   </div>
 
   <TaskSection
-    title="🍶 上槽"
-    tasks={todayTasks.joso}
-    renderContent={(tasks) => (
-      <>
-        {tasks.map((task, index) => (
-          <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm flex items-center justify-between">
-            <div>
-              <span className="font-bold text-blue-600">{task.jungoId}号</span>
-              <span className="ml-2 text-gray-600">No.{task.tankNo}→</span>
-              <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">
-                {task.brewingCategory}
-              </span>
-            </div>
-            <span className="text-gray-600 text-xs">
-              仕込規模: {task.brewingSize}kg
+  title="🍶 上槽"
+  tasks={todayTasks.joso}
+  renderContent={(tasks) => (
+    <>
+      {tasks.map((task, index) => (
+        <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm flex items-center justify-between">
+          <div>
+            <span className="font-bold text-blue-600">{task.jungoId}号</span>
+            <span className="ml-2 text-gray-600">
+              No.{task.tankNo}→{task.kenteiTankId ? `No.${task.kenteiTankId}` : '未設定'}
+            </span>
+            <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">
+              {task.brewingCategory}
             </span>
           </div>
-        ))}
-      </>
-    )}
-  />
+          <span className="text-gray-600 text-xs">
+            仕込規模: {task.brewingSize}kg
+          </span>
+        </div>
+      ))}
+    </>
+  )}
+/>
 
   {/* タスク管理アラート */}
   {dataContext.overdueTasks && dataContext.overdueTasks.length > 0 && (
