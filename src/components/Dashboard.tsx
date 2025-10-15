@@ -164,25 +164,30 @@ if (isSameDate(moromi.uchikomiDate, currentDate)) {
 
   moromiData.forEach((moromi: MoromiData) => {
     // 1. タンク洗い（翌日の準備）
-    if (isSameDate(moromi.motoOroshiDate, tomorrow)) {
-      const tankId = moromi.soeTankId || moromi.tankNo;
-      const tankType = moromi.soeTankId ? '添タンク' : '仕込みタンク';
-      tasks.tankWash.push({
-        jungoId: moromi.jungoId,
-        tankNo: tankId,
-        processType: tankType
-      });
-    }
-    
-    if (isSameDate(moromi.uchikomiDate, tomorrow)) {
-      if (moromi.soeTankId) {
-        tasks.tankWash.push({
-          jungoId: moromi.jungoId,
-          tankNo: moromi.tankNo,
-          processType: '仕込みタンク'
-        });
-      }
-    }
+    // 1. タンク洗い（翌日の準備）
+if (isSameDate(moromi.motoOroshiDate, tomorrow)) {
+  const tankId = moromi.soeTankId || moromi.tankNo;
+  const tankType = moromi.soeTankId ? '添タンク' : '仕込みタンク';
+  tasks.tankWash.push({
+    jungoId: moromi.jungoId,
+    tankNo: tankId,
+    processType: tankType
+  });
+}
+
+// 打ち込み日の2日前にタンク洗い
+const dayAfterTomorrow = new Date(currentDate);
+dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+if (isSameDate(moromi.uchikomiDate, dayAfterTomorrow)) {
+  if (moromi.soeTankId) {
+    tasks.tankWash.push({
+      jungoId: moromi.jungoId,
+      tankNo: moromi.tankNo,
+      processType: '仕込みタンク'
+    });
+  }
+}
 
     // 2. タンクに湯（当日がモト卸しor打ち込み）
     if (isSameDate(moromi.motoOroshiDate, currentDate)) {
@@ -415,11 +420,11 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
     else if (isSameDate(nakaShikomiDate, normalizedCurrentDate)) detail = '仲';
     else if (isSameDate(tomeShikomiDate, normalizedCurrentDate)) detail = '留';
     
-    return { status: `仕込み${detail ? `~${detail}~` : ''}`, color: 'bg-blue-200 text-blue-800', sortOrder: 2 };
+    return { status: `${detail ? `${detail}` : ''}`, color: 'bg-blue-200 text-blue-800', sortOrder: 2 };
   }
   else if (normalizedCurrentDate > tomeShikomiDate && normalizedCurrentDate <= josoDate) {
     const moromiDays = Math.ceil((normalizedCurrentDate.getTime() - tomeShikomiDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    return { status: `もろみ~${moromiDays}日目~`, color: 'bg-green-200 text-green-800', sortOrder: 1 };
+    return { status: `${moromiDays}日目`, color: 'bg-green-200 text-green-800', sortOrder: 1 };
   }
   else {
     return { status: '完了', color: 'bg-gray-300 text-gray-600', sortOrder: 5 };
