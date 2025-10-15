@@ -557,33 +557,51 @@ tbody tr.bg-gray-100 th:first-child {
     <td colSpan={3} className="border"></td>
   </tr>
 
-  {/* 打ち込み */}
-  <tr>
-    <td className="border p-2 font-medium sticky left-0 bg-white z-10">打ち込み</td>
-    {dates.map((date) => {
-      const moromi = moromiData.find(m => m.uchikomiDate.includes(date.substring(5)));
-      return (
-        <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
-          {moromi ? '打' : ''}
-        </td>
-      );
-    })}
-    <td colSpan={3} className="border"></td>
-  </tr>
+ {/* 打ち込み */}
+<tr>
+  <td className="border p-2 font-medium sticky left-0 bg-white z-10">打ち込み</td>
+  {dates.map((date) => {
+    const moromi = moromiData.find(m => m.uchikomiDate === date && m.soeTankId !== null);
+    return (
+      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {moromi ? '打' : ''}
+      </td>
+    );
+  })}
+  <td colSpan={3} className="border"></td>
+</tr>
 
-  {/* 上槽 */}
-  <tr>
-    <td className="border p-2 font-medium sticky left-0 bg-white z-10">上槽</td>
-    {dates.map((date) => {
-      const moromi = moromiData.find(m => m.josoDate.includes(date.substring(5)));
-      return (
-        <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
-          {moromi ? '上' : ''}
-        </td>
-      );
-    })}
-    <td colSpan={3} className="border"></td>
-  </tr>
+{/* 上槽 */}
+<tr>
+  <td className="border p-2 font-medium sticky left-0 bg-white z-10">上槽</td>
+  {dates.map((date) => {
+    const moromi = moromiData.find(m => m.josoDate === date);
+    return (
+      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {moromi ? '上' : ''}
+      </td>
+    );
+  })}
+  <td colSpan={3} className="border"></td>
+</tr>
+
+{/* 四段 */}
+<tr>
+  <td className="border p-2 font-medium sticky left-0 bg-white z-10">四段</td>
+  {dates.map((date) => {
+    const moromi = moromiData.find(m => {
+      if (m.yodanShikomiDate !== date) return false;
+      // 四段processが実際に存在するか確認
+      return moromiProcesses.some(p => p.jungoId === m.jungoId && p.processType === 'yodan');
+    });
+    return (
+      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+        {moromi ? '四' : ''}
+      </td>
+    );
+  })}
+  <td colSpan={3} className="border"></td>
+</tr>
 
   {/* 麹量 */}
   <tr>
