@@ -103,29 +103,59 @@ export default function CSVUpdate({ getAllData, saveMoromiData }: CSVUpdateProps
       });
 
       // マージ: 既存の保持データから、新しいデータと重複するものを除外
-      const finalMoromiData = [
-        ...keptMoromiData.filter(kept => 
-          !updatedMoromiData.some(updated => 
-            updated.by === kept.by && updated.jungoId === kept.jungoId
-          )
-        ),
-        ...updatedMoromiData
-      ].sort((a, b) => {
-        if (a.by !== b.by) return b.by - a.by;
-        return parseInt(a.jungoId) - parseInt(b.jungoId);
-      });
+      // MoromiDataのマージ: 既存データをベースにCSVで一部更新
+const finalMoromiData = [
+  ...keptMoromiData,  // 更新日より前はそのまま保持
+  ...updatedMoromiData.map(csvData => {
+    // 既存データを探す
+    const existing = currentData.moromiData.find(m =>
+      m.by === csvData.by && m.jungoId === csvData.jungoId
+    );
+    
+    if (existing) {
+      // 既存データがあれば、ユーザー入力フィールドを保持
+      return {
+        ...csvData,
+        soeTankId: existing.soeTankId,
+        kenteiTankId: existing.kenteiTankId,
+      };
+    }
+    
+    // 既存データがなければCSVデータをそのまま使う
+    return csvData;
+  })
+].sort((a, b) => {
+  if (a.by !== b.by) return b.by - a.by;
+  return parseInt(a.jungoId) - parseInt(b.jungoId);
+});
 
-      const finalProcesses = [
-        ...keptProcesses.filter(kept =>
-          !updatedProcesses.some(updated =>
-  updated.by === kept.by && 
-  updated.jungoId === kept.jungoId && 
-  updated.processType === kept.processType &&
-  updated.riceType === kept.riceType
-)
-        ),
-        ...updatedProcesses
-      ];
+// MoromiProcessのマージ: 既存データをベースにCSVで一部更新
+const finalProcesses = [
+  ...keptProcesses,  // 更新日より前はそのまま保持
+  ...updatedProcesses.map(csvProcess => {
+    // 既存データを探す
+    const existing = currentData.moromiProcesses.find(p =>
+      p.by === csvProcess.by &&
+      p.jungoId === csvProcess.jungoId &&
+      p.processType === csvProcess.processType &&
+      p.riceType === csvProcess.riceType
+    );
+    
+    if (existing) {
+      // 既存データがあれば、ユーザー入力フィールドを保持
+      return {
+        ...csvProcess,
+        predictedDekojiRate: existing.predictedDekojiRate,
+        lastSheetWeight: existing.lastSheetWeight,
+        actualDekojiRate: existing.actualDekojiRate,
+        storageType: existing.storageType,
+      };
+    }
+    
+    // 既存データがなければCSVデータをそのまま使う
+    return csvProcess;
+  })
+];
 
       await saveMoromiData(finalMoromiData, finalProcesses);
 

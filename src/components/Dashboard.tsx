@@ -44,26 +44,34 @@ export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData,
   };
 
   const getTodayTasks = () => {
-    const tasks: {
-      mori: TodayTask[];
-      hikomi: TodayTask[];
-      motoOroshi: TodayTask[];
-      shikomi: TodayTask[];
-      dekoji: TodayTask[];
-      senmai: TodayTask[];
-      edauchi: TodayTask[];
-      joso: TodayTask[];
-    } = {
-      mori: [],
-      hikomi: [],
-      motoOroshi: [],
-      shikomi: [],
-      dekoji: [],
-      senmai: [],
-      edauchi: [],
-      joso: []
-    };
-
+  const tasks: {
+    mori: TodayTask[];
+    hikomi: TodayTask[];
+    motoOroshi: TodayTask[];
+    shikomi: TodayTask[];
+    dekoji: TodayTask[];
+    senmai: TodayTask[];
+    edauchi: TodayTask[];
+    joso: TodayTask[];
+    tankWash: TodayTask[];      
+    tankHotWater: TodayTask[];  
+    matWash: TodayTask[];       // ← 追加
+    kenteiChange: { prev: string; current: string }[];
+  } = {
+    mori: [],
+    hikomi: [],
+    motoOroshi: [],
+    shikomi: [],
+    dekoji: [],
+    senmai: [],
+    edauchi: [],
+    joso: [],
+    tankWash: [],      
+    tankHotWater: [],  
+    matWash: [],       // ← 追加
+    kenteiChange: []   
+  };
+  
     moromiData.forEach((moromi: MoromiData) => {
       const moromiProcessList = moromiProcesses.filter(p => p.jungoId === moromi.jungoId);
 
@@ -73,6 +81,7 @@ export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData,
     tankNo: moromi.tankNo,       // ← 追加
     soeTankId: moromi.soeTankId
   });
+  
 }
 
 if (isSameDate(moromi.uchikomiDate, currentDate)) {
@@ -148,8 +157,83 @@ if (isSameDate(moromi.uchikomiDate, currentDate)) {
       });
     });
 
-    return tasks;
-  };
+    // 1. タンク洗い（翌日の準備）
+  // === 本日のタスク計算 ===
+  const tomorrow = new Date(currentDate);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  moromiData.forEach((moromi: MoromiData) => {
+    // 1. タンク洗い（翌日の準備）
+    if (isSameDate(moromi.motoOroshiDate, tomorrow)) {
+      const tankId = moromi.soeTankId || moromi.tankNo;
+      const tankType = moromi.soeTankId ? '添タンク' : '仕込みタンク';
+      tasks.tankWash.push({
+        jungoId: moromi.jungoId,
+        tankNo: tankId,
+        processType: tankType
+      });
+    }
+    
+    if (isSameDate(moromi.uchikomiDate, tomorrow)) {
+      if (moromi.soeTankId) {
+        tasks.tankWash.push({
+          jungoId: moromi.jungoId,
+          tankNo: moromi.tankNo,
+          processType: '仕込みタンク'
+        });
+      }
+    }
+
+    // 2. タンクに湯（当日がモト卸しor打ち込み）
+    if (isSameDate(moromi.motoOroshiDate, currentDate)) {
+      const tankId = moromi.soeTankId || moromi.tankNo;
+      const tankType = moromi.soeTankId ? '添タンク' : '仕込みタンク';
+      tasks.tankHotWater.push({
+        jungoId: moromi.jungoId,
+        tankNo: tankId,
+        processType: tankType
+      });
+    }
+    
+    if (isSameDate(moromi.uchikomiDate, currentDate)) {
+      if (moromi.soeTankId) {
+        tasks.tankHotWater.push({
+          jungoId: moromi.jungoId,
+          tankNo: moromi.tankNo,
+          processType: '仕込みタンク'
+        });
+      }
+    }
+
+    // 3. マット洗い（翌日が上槽）
+    if (isSameDate(moromi.josoDate, tomorrow)) {
+      tasks.matWash.push({
+        jungoId: moromi.jungoId,
+        tankNo: moromi.tankNo
+      });
+    }
+  });
+
+  // 4. 検定タンク変更
+  const todayJoso = moromiData.filter(m => isSameDate(m.josoDate, currentDate));
+  
+  if (todayJoso.length > 0) {
+    const previousJoso = moromiData
+      .filter(m => new Date(m.josoDate) < currentDate)
+      .sort((a, b) => new Date(b.josoDate).getTime() - new Date(a.josoDate).getTime())[0];
+    
+    if (previousJoso && previousJoso.kenteiTankId && todayJoso[0].kenteiTankId) {
+      if (previousJoso.kenteiTankId !== todayJoso[0].kenteiTankId) {
+        tasks.kenteiChange.push({
+          prev: previousJoso.kenteiTankId,
+          current: todayJoso[0].kenteiTankId
+        });
+      }
+    }
+  }
+
+  return tasks;
+};
 
   const getProcessName = (type: string): string => {
     const names: { [key: string]: string } = {
@@ -260,12 +344,12 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
 }
 
   const calculateMoromiDays = (tomeDate: string, josoDate: string): number => {
-    const tome = new Date(tomeDate);
-    const joso = new Date(josoDate);
-    const diffTime = Math.abs(joso.getTime() - tome.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+  const tome = new Date(tomeDate);
+  const joso = new Date(josoDate);
+  const diffTime = Math.abs(joso.getTime() - tome.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays + 1; // 開始日を含むため+1
+};
 
   // 日付比較のヘルパー関数
   const isSameDate = (date1: string | Date, date2: string | Date): boolean => {
@@ -404,7 +488,78 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
     📅 本日の予定
   </h3>
 
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div className="space-y-4">
+      <TaskSection
+        title="🌾 盛り"
+        tasks={todayTasks.mori}
+        renderContent={(tasks) => {
+          const total = calculateTotal(tasks);
+          return (
+            <>
+              {tasks.map((task, index) => (
+                <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                  <span className="font-bold text-blue-600">{task.jungoId}号</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
+                    {getProcessName(task.processType || '')}
+                  </span>
+                  <span className="ml-2 font-bold">{task.amount}kg</span>
+                  <span className="ml-1 text-gray-500">({task.riceType})</span>
+                </div>
+              ))}
+              <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                <span className="font-bold">合計: {total}kg</span>
+              </div>
+            </>
+          );
+        }}
+      />
+
+      <TaskSection
+        title="🌾 出麹"
+        tasks={todayTasks.dekoji}
+        renderContent={(tasks) => {
+          const distribution = getDekojiDistribution(tasks);
+          const total = calculateTotal(tasks);
+          
+          return (
+            <>
+              {distribution && (
+                <div className="mb-2">
+                  <button 
+  onClick={() => {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    window.dispatchEvent(new CustomEvent('navigateToDekojiPage', { detail: { date: dateStr } }));
+  }}
+  className="inline-block bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-sm font-bold text-green-700 transition-colors cursor-pointer"
+>
+  📊 棚配分 {distribution}
+</button>
+                </div>
+              )}
+              
+              {tasks.map((task, index) => (
+                <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                  <span className="font-bold text-green-600">{task.jungoId}号</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
+                    {getProcessName(task.processType || '')}
+                  </span>
+                  <span className="ml-2 font-bold">{task.amount}kg</span>
+                  <span className="ml-1 text-gray-500">({task.riceType})</span>
+                </div>
+              ))}
+              
+              {tasks.length > 0 && (
+                <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
+                  <span className="font-bold">合計: {total}kg</span>
+                </div>
+              )}
+            </>
+          );
+        }}
+      />
+    </div>
+
     <div className="space-y-4">
       <TaskSection
         title="🏺 引き込み"
@@ -458,7 +613,9 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
           );
         }}
       />
+    </div>
 
+    <div className="space-y-4">
       <TaskSection
   title="🌾 洗米"
   subtitle={(() => {
@@ -573,77 +730,6 @@ return (
   }}
 />
     </div>
-
-    <div className="space-y-4">
-      <TaskSection
-        title="🌾 盛り"
-        tasks={todayTasks.mori}
-        renderContent={(tasks) => {
-          const total = calculateTotal(tasks);
-          return (
-            <>
-              {tasks.map((task, index) => (
-                <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                  <span className="font-bold text-blue-600">{task.jungoId}号</span>
-                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
-                    {getProcessName(task.processType || '')}
-                  </span>
-                  <span className="ml-2 font-bold">{task.amount}kg</span>
-                  <span className="ml-1 text-gray-500">({task.riceType})</span>
-                </div>
-              ))}
-              <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-                <span className="font-bold">合計: {total}kg</span>
-              </div>
-            </>
-          );
-        }}
-      />
-
-      <TaskSection
-        title="🌾 出麹"
-        tasks={todayTasks.dekoji}
-        renderContent={(tasks) => {
-          const distribution = getDekojiDistribution(tasks);
-          const total = calculateTotal(tasks);
-          
-          return (
-            <>
-              {distribution && (
-                <div className="mb-2">
-                  <button 
-  onClick={() => {
-    const dateStr = currentDate.toISOString().split('T')[0];
-    window.dispatchEvent(new CustomEvent('navigateToDekojiPage', { detail: { date: dateStr } }));
-  }}
-  className="inline-block bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-sm font-bold text-green-700 transition-colors cursor-pointer"
->
-  📊 棚配分 {distribution}
-</button>
-                </div>
-              )}
-              
-              {tasks.map((task, index) => (
-                <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
-                  <span className="font-bold text-green-600">{task.jungoId}号</span>
-                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${getProcessColor(task.processType || '')}`}>
-                    {getProcessName(task.processType || '')}
-                  </span>
-                  <span className="ml-2 font-bold">{task.amount}kg</span>
-                  <span className="ml-1 text-gray-500">({task.riceType})</span>
-                </div>
-              ))}
-              
-              {tasks.length > 0 && (
-                <div className="border-t border-gray-300 mt-2 pt-2 text-right text-sm">
-                  <span className="font-bold">合計: {total}kg</span>
-                </div>
-              )}
-            </>
-          );
-        }}
-      />
-    </div>
   </div>
 
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -712,38 +798,105 @@ return (
   )}
 />
 
-  {/* タスク管理アラート */}
-  {dataContext.overdueTasks && dataContext.overdueTasks.length > 0 && (
-    <div className="mt-4 border-t-2 border-red-200 pt-4">
-      <h4 className="text-sm font-bold mb-2 text-red-600 border-b border-red-200 pb-1 flex items-center">
-        <span className="mr-2">⚠️</span>
-        タスク期限切れアラート
-        <span className="ml-2 text-xs font-normal bg-red-100 px-2 py-0.5 rounded">
-          {dataContext.overdueTasks.length}件
-        </span>
-      </h4>
-      <div className="space-y-1">
-        {dataContext.overdueTasks.map((task: OverdueTask) => (
-  <div 
-    key={task.id} 
-    className="bg-red-50 p-2 rounded border border-red-200 text-sm"
-  >
-    <div className="flex items-center justify-between">
-      <div>
-        <span className="font-bold text-red-700">{task.taskName}</span>
-        <span className="ml-2 text-gray-600 text-xs">
-          最終完了: {task.lastCompletedDate}
-        </span>
-      </div>
-      <span className="text-red-600 font-semibold">
-        {task.elapsedDays}日経過
-      </span>
+{/* 本日のタスク・定期タスク（2列） */}
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+    {/* 左列: 本日のタスク */}
+    <div className="bg-white rounded-lg shadow p-4">
+      <h3 className="text-lg font-bold mb-3 text-blue-800 border-b-2 border-blue-200 pb-2">
+        📝 本日のタスク
+      </h3>
+      
+      {/* タンク洗い */}
+      {todayTasks.tankWash.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-sm font-bold mb-2 text-gray-700">🧼 タンク洗い</h4>
+          <div className="space-y-1">
+            {todayTasks.tankWash.map((task, index) => (
+              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                <span className="font-bold text-blue-600">{task.jungoId}号:</span>
+                <span className="ml-2 text-gray-700">No.{task.tankNo}</span>
+                <span className="ml-1 text-gray-500 text-xs">({task.processType})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* タンクに湯 */}
+      {todayTasks.tankHotWater.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-sm font-bold mb-2 text-gray-700">🚰 タンクに湯</h4>
+          <div className="space-y-1">
+            {todayTasks.tankHotWater.map((task, index) => (
+              <div key={index} className="bg-gray-50 p-2 rounded border border-gray-200 text-sm">
+                <span className="font-bold text-blue-600">{task.jungoId}号:</span>
+                <span className="ml-2 text-gray-700">No.{task.tankNo}</span>
+                <span className="ml-1 text-gray-500 text-xs">({task.processType})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* 検定タンク変更 */}
+      {todayTasks.kenteiChange.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-sm font-bold mb-2 text-gray-700">🔄 検定タンク変更</h4>
+          <div className="space-y-1">
+            {todayTasks.kenteiChange.map((change, index) => (
+              <div key={index} className="bg-yellow-50 p-2 rounded border border-yellow-200 text-sm">
+                <span className="font-bold text-orange-600">
+                  No.{change.prev} → No.{change.current}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {todayTasks.tankWash.length === 0 && 
+       todayTasks.tankHotWater.length === 0 && 
+       todayTasks.kenteiChange.length === 0 && (
+        <div className="text-center py-4 text-gray-400 text-sm">
+          本日のタスクはありません
+        </div>
+      )}
+    </div>
+    
+    {/* 右列: 定期タスク */}
+    <div className="bg-white rounded-lg shadow p-4">
+      <h3 className="text-lg font-bold mb-3 text-red-800 border-b-2 border-red-200 pb-2">
+        📋 定期タスク
+      </h3>
+      
+      {dataContext.overdueTasks && dataContext.overdueTasks.length > 0 ? (
+        <div className="space-y-2">
+          {dataContext.overdueTasks.map((task: OverdueTask) => (
+            <div 
+              key={task.id} 
+              className="bg-red-50 p-3 rounded border border-red-200 text-sm"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-red-700">{task.taskName}</span>
+                  <span className="ml-2 text-gray-600 text-xs block mt-1">
+                    最終完了: {task.lastCompletedDate}
+                  </span>
+                </div>
+                <span className="text-red-600 font-semibold whitespace-nowrap ml-2">
+                  {task.elapsedDays}日経過 ⚠️
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-4 text-gray-400 text-sm">
+          期限切れタスクはありません
+        </div>
+      )}
     </div>
   </div>
-))}
-      </div>
-    </div>
-  )}
 
   {!hasAnyTasks && (!dataContext.overdueTasks || dataContext.overdueTasks.length === 0) && (
     <div className="text-center py-6 text-gray-400 text-sm">

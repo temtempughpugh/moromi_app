@@ -239,7 +239,7 @@ const handleSave = async () => {
                   <span className="ml-1 text-sm text-gray-500">({lot.processes[0].riceType}{lot.processes[0].polishingRatio})</span>
                   {lot.storageType && (
                     <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
-                      {lot.storageType === '冷蔵' ? '❄️ 冷蔵' : '🧊 冷凍'}
+                      {lot.storageType === '冷蔵' ? '💧 冷蔵' : '🧊 冷凍'}
                     </span>
                   )}
                 </div>
@@ -316,7 +316,7 @@ const handleSave = async () => {
               <td key={col} className="border border-gray-300 px-2 py-2 text-center text-xs font-semibold">
                 {storageType ? (
                   <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
-                    {storageType === '冷蔵' ? '❄️ 冷蔵' : '🧊 冷凍'}
+                    {storageType === '冷蔵' ? '💧 冷蔵' : '🧊 冷凍'}
                   </span>
                 ) : (
                   <span className="text-gray-400">-</span>
