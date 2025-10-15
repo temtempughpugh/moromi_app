@@ -287,36 +287,39 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
   const tomeShikomiDate = new Date(moromi.tomeShikomiDate);
   const josoDate = new Date(moromi.josoDate);
   
-  // 1. 準備
-  if (motoKakeDate && currentDate < motoKakeDate) {
+  // 🔥 重要：すべての日付を0時0分0秒に正規化
+  const normalizedCurrentDate = new Date(currentDate);
+  normalizedCurrentDate.setHours(0, 0, 0, 0);
+  
+  if (motoKakeDate) motoKakeDate.setHours(0, 0, 0, 0);
+  motoOroshiDate.setHours(0, 0, 0, 0);
+  soeShikomiDate.setHours(0, 0, 0, 0);
+  nakaShikomiDate.setHours(0, 0, 0, 0);
+  tomeShikomiDate.setHours(0, 0, 0, 0);
+  josoDate.setHours(0, 0, 0, 0);
+  
+  if (motoKakeDate && normalizedCurrentDate < motoKakeDate) {
     return { status: '準備', color: 'bg-gray-200 text-gray-700', sortOrder: 4 };
   }
-  // 2. モト卸
-  else if (isSameDate(motoOroshiDate, currentDate)) {
+  else if (isSameDate(motoOroshiDate, normalizedCurrentDate)) {
     return { status: 'モト卸', color: 'bg-purple-200 text-purple-800', sortOrder: 3 };
   }
-  // 3. モト
-  else if (motoKakeDate && currentDate >= motoKakeDate && currentDate < motoOroshiDate) {
+  else if (motoKakeDate && normalizedCurrentDate >= motoKakeDate && normalizedCurrentDate < motoOroshiDate) {
     return { status: 'モト', color: 'bg-purple-200 text-purple-800', sortOrder: 3 };
   }
-  // 4. 仕込み（留日まで含む）
-  else if (currentDate > motoOroshiDate && currentDate <= tomeShikomiDate) {
+  else if (normalizedCurrentDate > motoOroshiDate && normalizedCurrentDate <= tomeShikomiDate) {
     let detail = '';
-    if (isSameDate(soeShikomiDate, currentDate)) detail = '添';
-    else if (isSameDate(moromi.uchikomiDate, currentDate)) detail = '踊';
-    else if (isSameDate(nakaShikomiDate, currentDate)) detail = '仲';
-    else if (isSameDate(tomeShikomiDate, currentDate)) detail = '留';
+    if (isSameDate(soeShikomiDate, normalizedCurrentDate)) detail = '添';
+    else if (isSameDate(moromi.uchikomiDate, normalizedCurrentDate)) detail = '踊';
+    else if (isSameDate(nakaShikomiDate, normalizedCurrentDate)) detail = '仲';
+    else if (isSameDate(tomeShikomiDate, normalizedCurrentDate)) detail = '留';
     
     return { status: `仕込み${detail ? `~${detail}~` : ''}`, color: 'bg-blue-200 text-blue-800', sortOrder: 2 };
   }
-  // 5. もろみ（留日の翌日から）
-  else if (currentDate > tomeShikomiDate && currentDate <= josoDate) {
-    // 留日+1日 = 1 → +1 = 2日目
-    // 留日+2日 = 2 → +1 = 3日目
-    const moromiDays = Math.ceil((currentDate.getTime() - tomeShikomiDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  else if (normalizedCurrentDate > tomeShikomiDate && normalizedCurrentDate <= josoDate) {
+    const moromiDays = Math.ceil((normalizedCurrentDate.getTime() - tomeShikomiDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     return { status: `もろみ~${moromiDays}日目~`, color: 'bg-green-200 text-green-800', sortOrder: 1 };
   }
-  // 6. 完了
   else {
     return { status: '完了', color: 'bg-gray-300 text-gray-600', sortOrder: 5 };
   }
