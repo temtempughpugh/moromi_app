@@ -164,22 +164,21 @@ useEffect(() => {
 };
 
   const getProcessMarkForDate = (moromi: MoromiData, date: string): string => {
-    const processes = moromiProcesses.filter(p => p.jungoId === moromi.jungoId);
-    
-    const motoKake = processes.find(p => p.processType === 'motoKake');
-    
-    if (motoKake && motoKake.kakeShikomiDate === date) return 'モト';
-    
-    if (moromi.motoOroshiDate === date) return '卸';
-    if (moromi.soeShikomiDate === date) return '添';
-    if (moromi.uchikomiDate === date) return '打';
-    if (moromi.nakaShikomiDate === date) return '仲';
-    if (moromi.tomeShikomiDate === date) return '留';
-    if (moromi.yodanShikomiDate && moromi.yodanShikomiDate === date) return '四';
-    if (moromi.josoDate === date) return '上';
-    return '';
-  };
-
+  const processes = moromiProcesses.filter(p => p.jungoId === moromi.jungoId);
+  
+  const motoKake = processes.find(p => p.processType === 'motoKake');
+  
+  if (motoKake && motoKake.kakeShikomiDate === date) return 'モト';
+  
+  if (moromi.motoOroshiDate === date) return '卸';
+  if (moromi.soeShikomiDate === date) return '添';
+  if (moromi.uchikomiDate === date && moromi.soeTankId !== null) return '打';
+  if (moromi.nakaShikomiDate === date) return '仲';
+  if (moromi.tomeShikomiDate === date) return '留';
+  if (moromi.yodanShikomiDate && moromi.yodanShikomiDate === date && moromiProcesses.some(p => p.jungoId === moromi.jungoId && p.processType === 'yodan')) return '四';
+  if (moromi.josoDate === date) return '上';
+  return '';
+};
   const handlePrevMonth = () => {
     const [year, month] = currentShiftMonth.split('-').map(Number);
     const prevMonth = month === 1 ? 12 : month - 1;
@@ -476,7 +475,7 @@ tbody tr.bg-gray-100 th:first-child {
             <tr className="bg-gray-100">
               <th className="border p-1 sticky left-0 bg-gray-100 z-10 w-20">号/項目</th>
               {dates.map((date) => (
-                <th key={date} className={`border p-0.5 w-8 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+                <th key={date} className={`border p-0.5 w-8 ${new Date(date).getDay() === 0 || new Date(date).getDay() === 6 ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
   {new Date(date).getDate()}
 </th>
               ))}
@@ -584,25 +583,6 @@ tbody tr.bg-gray-100 th:first-child {
   })}
   <td colSpan={3} className="border"></td>
 </tr>
-
-{/* 四段 */}
-<tr>
-  <td className="border p-2 font-medium sticky left-0 bg-white z-10">四段</td>
-  {dates.map((date) => {
-    const moromi = moromiData.find(m => {
-      if (m.yodanShikomiDate !== date) return false;
-      // 四段processが実際に存在するか確認
-      return moromiProcesses.some(p => p.jungoId === m.jungoId && p.processType === 'yodan');
-    });
-    return (
-      <td key={date} className={`border p-1 text-center ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
-        {moromi ? '四' : ''}
-      </td>
-    );
-  })}
-  <td colSpan={3} className="border"></td>
-</tr>
-
   {/* 麹量 */}
   <tr>
     <td className="border p-2 font-medium sticky left-0 bg-white z-10">麹量</td>
@@ -657,9 +637,9 @@ tbody tr.bg-gray-100 th:first-child {
   <tr className="bg-gray-100">
     <th className="border p-1 sticky left-0 bg-gray-100 z-10">号/項目</th>
     {dates.map((date) => (
-      <th key={date} className={`border p-0.5 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
-        {new Date(date).getDate()}
-      </th>
+      <th key={date} className={`border p-0.5 ${new Date(date).getDay() === 0 || new Date(date).getDay() === 6 ? 'bg-blue-100' : ''} ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
+  {new Date(date).getDate()}
+</th>
     ))}
     <th className="border p-1">合計</th>
     <th className="border p-1">所定</th>
