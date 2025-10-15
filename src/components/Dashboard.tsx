@@ -287,15 +287,19 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
   const tomeShikomiDate = new Date(moromi.tomeShikomiDate);
   const josoDate = new Date(moromi.josoDate);
   
+  // 1. 準備
   if (motoKakeDate && currentDate < motoKakeDate) {
     return { status: '準備', color: 'bg-gray-200 text-gray-700', sortOrder: 4 };
   }
+  // 2. モト卸
   else if (isSameDate(motoOroshiDate, currentDate)) {
     return { status: 'モト卸', color: 'bg-purple-200 text-purple-800', sortOrder: 3 };
   }
+  // 3. モト
   else if (motoKakeDate && currentDate >= motoKakeDate && currentDate < motoOroshiDate) {
     return { status: 'モト', color: 'bg-purple-200 text-purple-800', sortOrder: 3 };
   }
+  // 4. 仕込み（留日まで含む）
   else if (currentDate > motoOroshiDate && currentDate <= tomeShikomiDate) {
     let detail = '';
     if (isSameDate(soeShikomiDate, currentDate)) detail = '添';
@@ -305,11 +309,14 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
     
     return { status: `仕込み${detail ? `~${detail}~` : ''}`, color: 'bg-blue-200 text-blue-800', sortOrder: 2 };
   }
+  // 5. もろみ（留日の翌日から）
   else if (currentDate > tomeShikomiDate && currentDate <= josoDate) {
-    // 留日を1日目として、翌日を2日目にする
+    // 留日+1日 = 1 → +1 = 2日目
+    // 留日+2日 = 2 → +1 = 3日目
     const moromiDays = Math.ceil((currentDate.getTime() - tomeShikomiDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     return { status: `もろみ~${moromiDays}日目~`, color: 'bg-green-200 text-green-800', sortOrder: 1 };
   }
+  // 6. 完了
   else {
     return { status: '完了', color: 'bg-gray-300 text-gray-600', sortOrder: 5 };
   }
