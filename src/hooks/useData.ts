@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { parseCSV } from '../utils/csvParser';
 import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty } from '../utils/database';
-import type { MoromiData, MoromiProcess } from '../utils/types';
+import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask } from '../utils/types';  // ← TaskManagement, OverdueTask を追加
 import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 import {
   getAllStaff,
@@ -15,6 +15,11 @@ import {
   saveMemoRow as saveMemoRowToSupabase,
   getRiceDelivery,
   saveRiceDelivery as saveRiceDeliveryToSupabase,
+  getAllTasks,  // ← 追加
+  addTask as dbAddTask,  // ← 追加
+  updateTask as dbUpdateTask,  // ← 追加
+  deleteTask as dbDeleteTask,  // ← 追加
+  getOverdueTasks,  // ← 追加
 } from '../utils/database';
 
 export function useData() {
@@ -32,6 +37,10 @@ export function useData() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+
+  // タスク管理用state
+  const [tasks, setTasks] = useState<TaskManagement[]>([]);
+  const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
 
   useEffect(() => {
     loadAllData();
@@ -55,6 +64,11 @@ export function useData() {
     loadAllStaff();
   }, []);
 
+   // タスク管理データの初回読み込み
+  useEffect(() => {
+    loadAllTasks();
+  }, []);
+
 
   const loadAllData = async () => {
     try {
@@ -70,6 +84,7 @@ export function useData() {
       if (bys.length > 0) {
         setCurrentBY(bys[0]);
       }
+      await loadAllTasks();
     } catch (error) {
       console.error('データ読み込みエラー:', error);
 console.error('エラー詳細:', JSON.stringify(error, null, 2));
@@ -194,6 +209,51 @@ const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) 
     await loadRiceDelivery(currentShiftMonth);
   };
 
+  // ========== タスク管理関連の関数 ==========
+  const loadAllTasks = async () => {
+    try {
+      const taskData = await getAllTasks();
+      setTasks(taskData);
+      
+      // 期限切れタスクの計算
+      const today = new Date();
+      const overdue = getOverdueTasks(taskData, today);
+      setOverdueTasks(overdue);
+    } catch (error) {
+      console.error('タスク読み込みエラー:', error);
+    }
+  };
+
+  const addTask = async (task: Omit<TaskManagement, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      await dbAddTask(task);
+      await loadAllTasks();
+    } catch (error) {
+      console.error('タスク追加エラー:', error);
+      throw error;
+    }
+  };
+
+  const updateTask = async (id: number, task: Partial<Omit<TaskManagement, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    try {
+      await dbUpdateTask(id, task);
+      await loadAllTasks();
+    } catch (error) {
+      console.error('タスク更新エラー:', error);
+      throw error;
+    }
+  };
+
+  const deleteTask = async (id: number) => {
+    try {
+      await dbDeleteTask(id);
+      await loadAllTasks();
+    } catch (error) {
+      console.error('タスク削除エラー:', error);
+      throw error;
+    }
+  };
+
   return {
     isLoading,
     availableBYs,
@@ -219,5 +279,11 @@ const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) 
     saveMonthlySettings,
     saveMemoRow,
     saveRiceDelivery,
+    tasks,
+    overdueTasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    refreshTasks: loadAllTasks,
   };
 }

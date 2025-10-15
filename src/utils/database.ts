@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { MoromiData, MoromiProcess } from './types';
-import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from './types';
+import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement } from './types';
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
@@ -445,4 +444,121 @@ export const saveRiceDelivery = async (riceDelivery: Omit<RiceDelivery, 'created
     });
 
   if (error) throw error;
+};
+// ============================================
+// タスク管理関連
+// ============================================
+
+/**
+ * すべてのタスクを取得
+ */
+export const getAllTasks = async (): Promise<TaskManagement[]> => {
+  const { data, error } = await supabase
+    .from('task_management')
+    .select('*')
+    .order('task_name', { ascending: true });
+  
+  if (error) {
+    console.error('タスク取得エラー:', error);
+    throw error;
+  }
+  
+  return (data || []).map(row => ({
+    id: row.id,
+    taskName: row.task_name,
+    lastCompletedDate: row.last_completed_date,
+    cycleDays: row.cycle_days,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+/**
+ * タスクを追加
+ */
+export const addTask = async (task: Omit<TaskManagement, 'id' | 'createdAt' | 'updatedAt'>): Promise<TaskManagement> => {
+  const { data, error } = await supabase
+    .from('task_management')
+    .insert({
+      task_name: task.taskName,
+      last_completed_date: task.lastCompletedDate,
+      cycle_days: task.cycleDays
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('タスク追加エラー:', error);
+    throw error;
+  }
+  
+  return {
+    id: data.id,
+    taskName: data.task_name,
+    lastCompletedDate: data.last_completed_date,
+    cycleDays: data.cycle_days,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  };
+};
+
+/**
+ * タスクを更新
+ */
+export const updateTask = async (id: number, task: Partial<Omit<TaskManagement, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> => {
+  const updateData: any = {};
+  if (task.taskName) updateData.task_name = task.taskName;
+  if (task.lastCompletedDate) updateData.last_completed_date = task.lastCompletedDate;
+  if (task.cycleDays !== undefined) updateData.cycle_days = task.cycleDays;
+  updateData.updated_at = new Date().toISOString();
+  
+  const { error } = await supabase
+    .from('task_management')
+    .update(updateData)
+    .eq('id', id);
+  
+  if (error) {
+    console.error('タスク更新エラー:', error);
+    throw error;
+  }
+};
+
+/**
+ * タスクを削除
+ */
+export const deleteTask = async (id: number): Promise<void> => {
+  const { error } = await supabase
+    .from('task_management')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('タスク削除エラー:', error);
+    throw error;
+  }
+};
+
+/**
+ * 期限切れのタスクを取得
+ */
+export const getOverdueTasks = (tasks: TaskManagement[], currentDate: Date): import('./types').OverdueTask[] => {
+  const overdueTasks: import('./types').OverdueTask[] = [];
+  
+  tasks.forEach(task => {
+    const lastDate = new Date(task.lastCompletedDate);
+    const diffTime = currentDate.getTime() - lastDate.getTime();
+    const elapsedDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (elapsedDays > task.cycleDays) {
+      overdueTasks.push({
+        id: task.id!,
+        taskName: task.taskName,
+        lastCompletedDate: task.lastCompletedDate,
+        cycleDays: task.cycleDays,
+        elapsedDays
+      });
+    }
+  });
+  
+  return overdueTasks.sort((a, b) => b.elapsedDays - a.elapsedDays);
 };

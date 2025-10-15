@@ -135,3 +135,20 @@ export interface DekojiWorkData {
   lastSheetWeight?: number;     // 最後の1枚の重量(kg)
   actualDekojiRate?: number;    // 真の出麹歩合(%)
 }
+// タスク管理用の型定義
+export interface TaskManagement {
+  id?: number;
+  taskName: string;
+  lastCompletedDate: string; // YYYY-MM-DD形式
+  cycleDays: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface OverdueTask {
+  id: number;
+  taskName: string;
+  lastCompletedDate: string;
+  cycleDays: number;
+  elapsedDays: number;
+}

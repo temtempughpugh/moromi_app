@@ -3,10 +3,10 @@ import Dashboard from './components/Dashboard';
 import CSVUpdate from './components/CSVUpdate';
 import ShiftCalendar from './components/ShiftCalendar';
 import DekojiPage from './components/DekojiPage';
+import TaskManagement from './components/TaskManagement';  // ← 追加
 import { useData } from './hooks/useData';
 
-type Page = 'dashboard' | 'tank-assignment' | 'tank-settings' | 'analysis-settings' | 'csv-update' | 'shift' | 'dekoji';
-
+type Page = 'dashboard' | 'tank-assignment' | 'tank-settings' | 'analysis-settings' | 'csv-update' | 'shift' | 'dekoji' | 'task-management';  // ← task-managementを追加
 export default function App() {
   const dataContext = useData();
 useEffect(() => {
@@ -111,6 +111,16 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
           シフト表
         </button>
         <button
+  onClick={() => setCurrentPage('task-management')}
+  className={`px-4 py-2 rounded transition ${
+    currentPage === 'task-management'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'hover:bg-blue-800'
+  }`}
+>
+  📋 タスク管理
+</button>
+        <button
           onClick={() => setCurrentPage('csv-update')}
           className={`px-4 py-2 rounded transition ${
             currentPage === 'csv-update'
@@ -127,18 +137,17 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
 
       <main className="container mx-auto px-6 py-8">
         {currentPage === 'dashboard' && (
-          <>
-           <Dashboard
-  moromiData={dataContext.moromiData}
-  moromiProcesses={dataContext.moromiProcesses}
-  getProcessesByMoromi={dataContext.getProcessesByMoromi}
-  saveMoromiData={dataContext.saveMoromiData}
-  loadMoromiByBY={dataContext.loadMoromiByBY}
-  currentBY={dataContext.currentBY}
-/>
-          </>
-        )}
-
+  <Dashboard 
+    moromiData={dataContext.moromiData}
+    moromiProcesses={dataContext.moromiProcesses}
+    getProcessesByMoromi={dataContext.getProcessesByMoromi}
+    saveMoromiData={dataContext.saveMoromiData}
+    loadMoromiByBY={dataContext.loadMoromiByBY}
+    currentBY={dataContext.currentBY}
+    dataContext={dataContext}  // ← 追加
+  />
+)}
+          
         {currentPage === 'shift' && (
   <ShiftCalendar
     currentShiftMonth={dataContext.currentShiftMonth}
@@ -170,6 +179,13 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
     dataContext={dataContext}
     dekojiDate={dekojiDate}
     onBack={() => setCurrentPage('dashboard')}
+  />
+)}
+
+{currentPage === 'task-management' && (
+  <TaskManagement 
+    dataContext={dataContext}
+    onClose={() => setCurrentPage('dashboard')}
   />
 )}
       </main>

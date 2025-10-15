@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MoromiData, MoromiProcess } from '../utils/types';
+import type { MoromiData, MoromiProcess, OverdueTask } from '../utils/types';
 import { Fragment } from 'react';
 import { KojiService } from '../services/KojiService';
 
@@ -10,6 +10,7 @@ interface DashboardProps {
   saveMoromiData: (moromiDataList: MoromiData[], processList: MoromiProcess[]) => Promise<void>;
   loadMoromiByBY: (by: number) => Promise<void>;
   currentBY: number;
+  dataContext: any;  // ← 追加
 }
 
 interface TodayTask {
@@ -24,7 +25,7 @@ interface TodayTask {
   process?: MoromiProcess;
 }
 
-export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData, loadMoromiByBY, currentBY }: DashboardProps) {
+export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData, loadMoromiByBY, currentBY, dataContext }: DashboardProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [expandedJungo, setExpandedJungo] = useState<string | null>(null);
@@ -707,7 +708,40 @@ return (
     )}
   />
 
-  {!hasAnyTasks && (
+  {/* タスク管理アラート */}
+  {dataContext.overdueTasks && dataContext.overdueTasks.length > 0 && (
+    <div className="mt-4 border-t-2 border-red-200 pt-4">
+      <h4 className="text-sm font-bold mb-2 text-red-600 border-b border-red-200 pb-1 flex items-center">
+        <span className="mr-2">⚠️</span>
+        タスク期限切れアラート
+        <span className="ml-2 text-xs font-normal bg-red-100 px-2 py-0.5 rounded">
+          {dataContext.overdueTasks.length}件
+        </span>
+      </h4>
+      <div className="space-y-1">
+        {dataContext.overdueTasks.map((task: OverdueTask) => (
+  <div 
+    key={task.id} 
+    className="bg-red-50 p-2 rounded border border-red-200 text-sm"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <span className="font-bold text-red-700">{task.taskName}</span>
+        <span className="ml-2 text-gray-600 text-xs">
+          最終完了: {task.lastCompletedDate}
+        </span>
+      </div>
+      <span className="text-red-600 font-semibold">
+        {task.elapsedDays}日経過
+      </span>
+    </div>
+  </div>
+))}
+      </div>
+    </div>
+  )}
+
+  {!hasAnyTasks && (!dataContext.overdueTasks || dataContext.overdueTasks.length === 0) && (
     <div className="text-center py-6 text-gray-400 text-sm">
       本日の予定はありません
     </div>
