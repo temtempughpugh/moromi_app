@@ -273,69 +273,47 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
 
   // もろみのステータスを判定する関数
   const getMoromiStatus = (moromi: MoromiData, currentDate: Date) => {
-    // モト掛け仕込み日を取得
-    const motoKakeProcess = moromiProcesses.find(
-      p => p.jungoId === moromi.jungoId && p.processType === 'motoKake'
-    );
+  const motoKakeProcess = moromiProcesses.find(
+    p => p.jungoId === moromi.jungoId && p.processType === 'motoKake'
+  );
+  
+  const motoKakeDate = motoKakeProcess?.kakeShikomiDate 
+    ? new Date(motoKakeProcess.kakeShikomiDate) 
+    : null;
+  
+  const motoOroshiDate = new Date(moromi.motoOroshiDate);
+  const soeShikomiDate = new Date(moromi.soeShikomiDate);
+  const nakaShikomiDate = new Date(moromi.nakaShikomiDate);
+  const tomeShikomiDate = new Date(moromi.tomeShikomiDate);
+  const josoDate = new Date(moromi.josoDate);
+  
+  if (motoKakeDate && currentDate < motoKakeDate) {
+    return { status: '準備', color: 'bg-gray-200 text-gray-700', sortOrder: 4 };
+  }
+  else if (isSameDate(motoOroshiDate, currentDate)) {
+    return { status: 'モト卸', color: 'bg-purple-200 text-purple-800', sortOrder: 3 };
+  }
+  else if (motoKakeDate && currentDate >= motoKakeDate && currentDate < motoOroshiDate) {
+    return { status: 'モト', color: 'bg-purple-200 text-purple-800', sortOrder: 3 };
+  }
+  else if (currentDate > motoOroshiDate && currentDate <= tomeShikomiDate) {
+    let detail = '';
+    if (isSameDate(soeShikomiDate, currentDate)) detail = '添';
+    else if (isSameDate(moromi.uchikomiDate, currentDate)) detail = '踊';
+    else if (isSameDate(nakaShikomiDate, currentDate)) detail = '仲';
+    else if (isSameDate(tomeShikomiDate, currentDate)) detail = '留';
     
-    const motoKakeDate = motoKakeProcess?.kakeShikomiDate 
-      ? new Date(motoKakeProcess.kakeShikomiDate) 
-      : null;
-    
-    const motoOroshiDate = new Date(moromi.motoOroshiDate);
-    const soeDate = new Date(moromi.soeShikomiDate);
-    const tomeDate = new Date(moromi.tomeShikomiDate);
-    const josoDate = new Date(moromi.josoDate);
-    
-    // 1. 準備中（モト掛け仕込み日より前）
-    if (motoKakeDate && currentDate < motoKakeDate) {
-      return { 
-        status: '準備', 
-        color: 'bg-gray-200 text-gray-700', 
-        sortOrder: 4 
-      };
-    } 
-    // 2. モト期間（モト掛け仕込み日〜モト卸日）
-    else if (motoKakeDate && currentDate >= motoKakeDate && currentDate <= motoOroshiDate) {
-      return { 
-        status: 'モト', 
-        color: 'bg-purple-200 text-purple-800', 
-        sortOrder: 3    // ← 1から3に変更
-      };
-    } 
-    // 3. 仕込み期間（添仕込日〜留仕込日）
-    else if (currentDate > motoOroshiDate && currentDate <= tomeDate) {
-      let detail = '';
-      if (isSameDate(soeDate, currentDate)) detail = '添';
-      else if (isSameDate(moromi.uchikomiDate, currentDate)) detail = '踊';
-      else if (isSameDate(moromi.nakaShikomiDate, currentDate)) detail = '仲';
-      else if (isSameDate(tomeDate, currentDate)) detail = '留';
-      
-      return { 
-        status: `仕込み${detail ? `~${detail}~` : ''}`, 
-        color: 'bg-blue-200 text-blue-800', 
-        sortOrder: 2    // ← そのまま2
-      };
-    } 
-    // 4. もろみ期間（留仕込日翌日〜上槽日前日）
-    else if (currentDate > tomeDate && currentDate < josoDate) {
-      const moromiDays = Math.ceil((currentDate.getTime() - tomeDate.getTime()) / (1000 * 60 * 60 * 24));
-      return { 
-        status: `もろみ~${moromiDays}日目~`, 
-        color: 'bg-green-200 text-green-800', 
-        sortOrder: 1    // ← 3から1に変更
-      };
-    } 
-    // 5. 完了（上槽日以降）
-    else {
-      return { 
-        status: '完了', 
-        color: 'bg-gray-300 text-gray-600', 
-        sortOrder: 5    // ← そのまま5
-      };
-    }
-  };
-
+    return { status: `仕込み${detail ? `~${detail}~` : ''}`, color: 'bg-blue-200 text-blue-800', sortOrder: 2 };
+  }
+  else if (currentDate > tomeShikomiDate && currentDate <= josoDate) {
+    // 留日を1日目として、翌日を2日目にする
+    const moromiDays = Math.ceil((currentDate.getTime() - tomeShikomiDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return { status: `もろみ~${moromiDays}日目~`, color: 'bg-green-200 text-green-800', sortOrder: 1 };
+  }
+  else {
+    return { status: '完了', color: 'bg-gray-300 text-gray-600', sortOrder: 5 };
+  }
+};
  interface TaskSectionProps {
   title: string;
   tasks: TodayTask[];
