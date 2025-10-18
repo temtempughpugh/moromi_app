@@ -620,7 +620,7 @@ export const getCurrentDutyStaff = (
 ): Staff | null => {
   if (duties.length === 0 || staffList.length === 0) return null;
 
-  // 基準日を取得（最初の当番の基準日）
+  // 基準日を取得(最初の当番の基準日)
   const baseDate = new Date(duties[0].baseDate);
   baseDate.setHours(0, 0, 0, 0);
 
@@ -632,8 +632,12 @@ export const getCurrentDutyStaff = (
   const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
 
   // 当番のインデックスを計算（循環）
-  const dutyIndex = diffWeeks % duties.length;
+  // 負の値にも対応するため、((n % m) + m) % m のパターンを使用
+  const dutyIndex = ((diffWeeks % duties.length) + duties.length) % duties.length;
   const currentDuty = duties[dutyIndex];
+
+  // currentDuty が存在しない場合の安全チェック
+  if (!currentDuty) return null;
 
   // スタッフを検索
   return staffList.find(s => s.id === currentDuty.staffId) || null;
