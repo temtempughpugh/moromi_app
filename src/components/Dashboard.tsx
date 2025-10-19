@@ -1107,6 +1107,56 @@ return (
             </tbody>
           </table>
         </div>
+        {/* スマホ版 - カード表示 */}
+<div className="md:hidden p-4 space-y-3">
+  {[...moromiData]
+    .sort((a, b) => {
+      const statusA = getMoromiStatus(a, currentDate);
+      const statusB = getMoromiStatus(b, currentDate);
+      if (statusA.sortOrder !== statusB.sortOrder) {
+        return statusA.sortOrder - statusB.sortOrder;
+      }
+      return parseInt(a.jungoId) - parseInt(b.jungoId);
+    })
+    .map((moromi: MoromiData) => {
+      const moromiDays = calculateMoromiDays(moromi.tomeDate, moromi.josoDate);
+      const statusInfo = getMoromiStatus(moromi, currentDate);
+      const isExpanded = expandedJungo === moromi.jungoId;
+      return (
+        <div key={moromi.jungoId} className="bg-white border-2 border-slate-200 rounded-lg shadow-sm">
+          <div className="p-4 cursor-pointer active:bg-slate-50" onClick={() => setExpandedJungo(isExpanded ? null : moromi.jungoId)}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-lg font-bold text-blue-600">{moromi.jungoId}号</span>
+              <span className={`px-2 py-1 rounded text-xs font-semibold ${statusInfo.color}`}>{statusInfo.status}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div><span className="text-gray-600">規模:</span><span className="ml-1 font-semibold">{moromi.brewingSize}kg</span></div>
+              <div><span className="text-gray-600">日数:</span><span className="ml-1 font-semibold">{moromiDays}日</span></div>
+              <div><span className="text-gray-600">留日:</span><span className="ml-1">{moromi.tomeDate.substring(5)}</span></div>
+              <div><span className="text-gray-600">上槽:</span><span className="ml-1">{moromi.josoDate.substring(5)}</span></div>
+            </div>
+            <div className="mt-2 text-xs text-gray-600">{moromi.brewingCategory}</div>
+            <div className="text-right mt-2"><span className="text-blue-600 text-sm font-semibold">{isExpanded ? '▲ 閉じる' : '▼ 詳細'}</span></div>
+          </div>
+          {isExpanded && (
+            <div className="border-t border-slate-200 p-4 bg-slate-50 space-y-3">
+              <div className="text-xs space-y-1">
+                <div><span className="text-gray-600">添タンク:</span> <span className="font-semibold">{moromi.soeTankId || '-'}</span></div>
+                <div><span className="text-gray-600">タンク:</span> <span className="font-semibold">{moromi.tankNo || '-'}</span></div>
+                <div><span className="text-gray-600">検定タンク:</span> <span className="font-semibold">{moromi.kenteiTankId || '-'}</span></div>
+                <div className="pt-2 border-t">
+                  <div>酒母卸: {moromi.motoOroshiDate.substring(5)}</div>
+                  <div>添仕込: {moromi.soeShikomiDate.substring(5)}</div>
+                  <div>仲仕込: {moromi.nakaShikomiDate.substring(5)}</div>
+                  <div>留仕込: {moromi.tomeShikomiDate.substring(5)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    })}
+</div>
       </div>
     </div>
   );

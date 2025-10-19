@@ -7,6 +7,8 @@ import TaskManagement from './components/TaskManagement';  // ← 追加
 import JosoHyokaComponent from './components/JosoHyoka';
 import { useData } from './hooks/useData';
 
+
+
 type Page = 'dashboard' | 'shift' | 'csv-update' | 'dekoji' | 'task-management' | 'joso-hyoka';
 export default function App() {
   const dataContext = useData();
@@ -20,7 +22,7 @@ useEffect(() => {
   return () => window.removeEventListener('navigateToDekojiPage', handleNavigate as EventListener);
 }, []);
 
-
+const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 const [dekojiDate, setDekojiDate] = useState<string>('');
   
@@ -70,17 +72,18 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <nav className="bg-gradient-to-r from-blue-900 to-blue-700 text-white shadow-lg">
-  <div className="container mx-auto px-6 py-4">
+      <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl">
+  <div className="container mx-auto px-4 md:px-6 py-4">
     <div className="flex justify-between items-center">
-      <div className="flex items-center gap-6">
-        <h1 className="text-2xl font-bold">もろみ管理システム</h1>
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold">醸造年度:</label>
+      {/* 左側 - タイトルと年度選択 */}
+      <div className="flex items-center gap-2 md:gap-6">
+        <h1 className="text-lg md:text-2xl font-bold">もろみ管理</h1>
+        <div className="flex items-center gap-1 md:gap-2">
+          <label className="text-xs md:text-sm font-semibold hidden md:inline">醸造年度:</label>
           <select
             value={dataContext.currentBY}
             onChange={(e) => dataContext.setCurrentBY(Number(e.target.value))}
-            className="px-3 py-1 bg-white text-blue-900 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 font-semibold"
+            className="px-2 md:px-3 py-1 bg-white text-blue-900 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 font-semibold text-sm"
           >
             {dataContext.availableBYs.map((by) => (
               <option key={by} value={by}>
@@ -90,7 +93,9 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
           </select>
         </div>
       </div>
-      <div className="flex gap-2">
+
+      {/* PC版 - ナビゲーションボタン */}
+      <div className="hidden md:flex gap-2">
         <button
           onClick={() => setCurrentPage('dashboard')}
           className={`px-4 py-2 rounded transition ${
@@ -112,27 +117,17 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
           シフト表
         </button>
         <button
-  onClick={() => setCurrentPage('task-management')}
-  className={`px-4 py-2 rounded transition ${
-    currentPage === 'task-management'
-      ? 'bg-white text-blue-900 font-bold'
-      : 'hover:bg-blue-800'
-  }`}
->
-   📋 タスク管理
-</button>
-<button
-  onClick={() => setCurrentPage('joso-hyoka')}
-  className={`px-4 py-2 rounded transition ${
-    currentPage === 'joso-hyoka'
-      ? 'bg-white text-blue-900 font-bold'
-      : 'hover:bg-blue-800'
-  }`}
->
-  上槽一覧
-</button>
-<button
-  onClick={() => setCurrentPage('csv-update')}
+          onClick={() => setCurrentPage('task-management')}
+          className={`px-4 py-2 rounded transition ${
+            currentPage === 'task-management'
+              ? 'bg-white text-blue-900 font-bold'
+              : 'hover:bg-blue-800'
+          }`}
+        >
+          📋 タスク管理
+        </button>
+        <button
+          onClick={() => setCurrentPage('csv-update')}
           className={`px-4 py-2 rounded transition ${
             currentPage === 'csv-update'
               ? 'bg-white text-blue-900 font-bold'
@@ -142,11 +137,83 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
           CSV更新
         </button>
       </div>
+
+      {/* スマホ版 - ハンバーガーメニューボタン */}
+      <button
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        className="md:hidden p-2 hover:bg-blue-800 rounded"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {isMobileMenuOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
     </div>
+
+    {/* スマホ版 - メニュー展開 */}
+    {isMobileMenuOpen && (
+      <div className="md:hidden mt-4 space-y-2">
+        <button
+          onClick={() => {
+            setCurrentPage('dashboard');
+            setIsMobileMenuOpen(false);
+          }}
+          className={`w-full text-left px-4 py-3 rounded transition ${
+            currentPage === 'dashboard'
+              ? 'bg-white text-blue-900 font-bold'
+              : 'bg-blue-800 hover:bg-blue-700'
+          }`}
+        >
+          📊 ダッシュボード
+        </button>
+        <button
+          onClick={() => {
+            setCurrentPage('shift');
+            setIsMobileMenuOpen(false);
+          }}
+          className={`w-full text-left px-4 py-3 rounded transition ${
+            currentPage === 'shift'
+              ? 'bg-white text-blue-900 font-bold'
+              : 'bg-blue-800 hover:bg-blue-700'
+          }`}
+        >
+          📅 シフト表
+        </button>
+        <button
+          onClick={() => {
+            setCurrentPage('task-management');
+            setIsMobileMenuOpen(false);
+          }}
+          className={`w-full text-left px-4 py-3 rounded transition ${
+            currentPage === 'task-management'
+              ? 'bg-white text-blue-900 font-bold'
+              : 'bg-blue-800 hover:bg-blue-700'
+          }`}
+        >
+          📋 タスク管理
+        </button>
+        <button
+          onClick={() => {
+            setCurrentPage('csv-update');
+            setIsMobileMenuOpen(false);
+          }}
+          className={`w-full text-left px-4 py-3 rounded transition ${
+            currentPage === 'csv-update'
+              ? 'bg-white text-blue-900 font-bold'
+              : 'bg-blue-800 hover:bg-blue-700'
+          }`}
+        >
+          📄 CSV更新
+        </button>
+      </div>
+    )}
   </div>
 </nav>
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-4 md:px-6 py-4 md:py-8">
         {currentPage === 'dashboard' && (
   <Dashboard 
     moromiData={dataContext.moromiData}
