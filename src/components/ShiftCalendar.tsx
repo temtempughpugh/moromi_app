@@ -198,9 +198,12 @@ useEffect(() => {
     setCurrentShiftMonth(`${nextYear}-${String(nextMonth).padStart(2, '0')}`);
   };
 
-  const getShift = (staffId: string, date: string): Shift | null => {
+  // propsのshiftsと、編集中のlocalShiftsの両方を見る必要がある
+const getShift = (staffId: string, date: string): Shift | null => {
   const key = `${staffId}-${date}`;
-  return localShifts[key] || null;
+  // まずlocalShifts（編集中）をチェック、なければpropsのshiftsから取得
+  if (localShifts[key]) return localShifts[key];
+  return shifts.find(s => s.staffId === staffId && s.date === date) || null;
 };
 
   const handleShiftChange = (staffId: string, date: string, value: string) => {
@@ -547,10 +550,14 @@ tbody tr.bg-gray-100 th:first-child {
           className="w-full text-center bg-transparent text-[10px] appearance-none"
           value={localRiceDeliveries[i] || riceDelivery?.deliveries[i] || ''}
           onChange={(e) => {
-            const newDeliveries = [...(riceDelivery?.deliveries || Array(dates.length).fill(''))];
-            newDeliveries[i] = e.target.value as '◯' | '⚫️' | '';
-            setLocalRiceDeliveries(newDeliveries);
-          }}
+  // localRiceDeliveriesが既にあればそれをベースに、なければriceDeliveryから
+  const baseDeliveries = localRiceDeliveries.length > 0 
+    ? localRiceDeliveries 
+    : (riceDelivery?.deliveries || Array(dates.length).fill(''));
+  const newDeliveries = [...baseDeliveries];
+  newDeliveries[i] = e.target.value as '◯' | '⚫️' | '';
+  setLocalRiceDeliveries(newDeliveries);
+}}
         >
           <option value=""></option>
           <option value="◯">◯</option>
