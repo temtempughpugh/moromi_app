@@ -51,18 +51,6 @@ const [localMinimumStaff, setLocalMinimumStaff] = useState<number[]>([]);
 const [localStandardHours, setLocalStandardHours] = useState<Record<string, number>>({});
 const [isSaving, setIsSaving] = useState(false);
 
-// ここに追加
-useEffect(() => {
-  const shiftsObject: Record<string, Shift> = {};
-  shifts.forEach(shift => {
-    shiftsObject[`${shift.staffId}-${shift.date}`] = shift;
-  });
-  setLocalShifts(shiftsObject);
-}, [currentShiftMonth, shifts]);
-
-// ↓ これを追加 ← このコメントと次のshiftsMapを削除
-
-
   const generateDates = () => {
     const dates: string[] = [];
     const [year, month] = currentShiftMonth.split('-').map(Number);
@@ -531,10 +519,14 @@ tbody tr.bg-gray-100 th:first-child {
           className="w-full text-center bg-transparent text-[10px]"
           value={localMemos[i] || memoRow?.memos[i] || ''}
           onChange={(e) => {
-            const newMemos = [...(memoRow?.memos || Array(dates.length).fill(''))];
-            newMemos[i] = e.target.value;
-            setLocalMemos(newMemos);
-          }}
+  // localMemosが既にあればそれをベースに
+  const baseMemos = localMemos.length > 0 
+    ? localMemos 
+    : (memoRow?.memos || Array(dates.length).fill(''));
+  const newMemos = [...baseMemos];
+  newMemos[i] = e.target.value;
+  setLocalMemos(newMemos);
+}}
         />
       </td>
     ))}
