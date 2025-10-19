@@ -127,6 +127,16 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
           📋 タスク管理
         </button>
         <button
+  onClick={() => setCurrentPage('joso-hyoka')}
+  className={`px-4 py-2 rounded transition ${
+    currentPage === 'joso-hyoka'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'hover:bg-blue-800'
+  }`}
+>
+  上槽一覧
+</button>
+        <button
           onClick={() => setCurrentPage('csv-update')}
           className={`px-4 py-2 rounded transition ${
             currentPage === 'csv-update'
@@ -195,6 +205,16 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
         >
           📋 タスク管理
         </button>
+        <button
+  onClick={() => {setCurrentPage('joso-hyoka'); setIsMobileMenuOpen(false);}}
+  className={`w-full text-left px-4 py-3 rounded transition ${
+    currentPage === 'joso-hyoka'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'bg-blue-800 hover:bg-blue-700'
+  }`}
+>
+  🍶 上槽一覧
+</button>
         <button
           onClick={() => {
             setCurrentPage('csv-update');
