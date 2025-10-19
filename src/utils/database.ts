@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty } from './types';
+import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty, JosoHyoka } from './types';
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
@@ -445,10 +445,42 @@ export const saveRiceDelivery = async (riceDelivery: Omit<RiceDelivery, 'created
 
   if (error) throw error;
 };
+
 // ============================================
-// タスク管理関連
+// 上槽評価関連
 // ============================================
 
+export const getJosoHyokaByBY = async (by: number): Promise<JosoHyoka[]> => {
+  const { data, error } = await supabase
+    .from('joso_hyoka')
+    .select('*')
+    .eq('by', by);
+
+  if (error) throw error;
+
+  return (data || []).map(row => ({
+    by: row.by,
+    jungoId: row.jungo_id,
+    rating: row.rating,
+    staffComments: row.staff_comments || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const saveJosoHyoka = async (hyoka: Omit<JosoHyoka, 'createdAt' | 'updatedAt'>): Promise<void> => {
+  const { error } = await supabase
+    .from('joso_hyoka')
+    .upsert({
+      by: hyoka.by,
+      jungo_id: hyoka.jungoId,
+      rating: hyoka.rating,
+      staff_comments: hyoka.staffComments,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) throw error;
+};
 /**
  * すべてのタスクを取得
  */

@@ -163,3 +163,13 @@ export interface WeeklyDuty {
   createdAt: string;
   updatedAt: string;
 }
+
+// 上槽評価データ
+export interface JosoHyoka {
+  by: number;
+  jungoId: string;
+  rating: 'S' | 'A' | 'B' | 'C' | 'D' | null;
+  staffComments: { [staffId: string]: string };
+  createdAt: string;
+  updatedAt: string;
+}

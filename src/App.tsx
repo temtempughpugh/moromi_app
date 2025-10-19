@@ -4,9 +4,10 @@ import CSVUpdate from './components/CSVUpdate';
 import ShiftCalendar from './components/ShiftCalendar';
 import DekojiPage from './components/DekojiPage';
 import TaskManagement from './components/TaskManagement';  // ← 追加
+import JosoHyokaComponent from './components/JosoHyoka';
 import { useData } from './hooks/useData';
 
-type Page = 'dashboard' | 'tank-assignment' | 'tank-settings' | 'analysis-settings' | 'csv-update' | 'shift' | 'dekoji' | 'task-management';  // ← task-managementを追加
+type Page = 'dashboard' | 'shift' | 'csv-update' | 'dekoji' | 'task-management' | 'joso-hyoka';
 export default function App() {
   const dataContext = useData();
 useEffect(() => {
@@ -118,10 +119,20 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
       : 'hover:bg-blue-800'
   }`}
 >
-  📋 タスク管理
+   📋 タスク管理
 </button>
-        <button
-          onClick={() => setCurrentPage('csv-update')}
+<button
+  onClick={() => setCurrentPage('joso-hyoka')}
+  className={`px-4 py-2 rounded transition ${
+    currentPage === 'joso-hyoka'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'hover:bg-blue-800'
+  }`}
+>
+  上槽一覧
+</button>
+<button
+  onClick={() => setCurrentPage('csv-update')}
           className={`px-4 py-2 rounded transition ${
             currentPage === 'csv-update'
               ? 'bg-white text-blue-900 font-bold'
@@ -188,6 +199,16 @@ weeklyDuties={dataContext.weeklyDuties}
   <TaskManagement 
     dataContext={dataContext}
     onClose={() => setCurrentPage('dashboard')}
+  />
+)}
+
+{currentPage === 'joso-hyoka' && (
+  <JosoHyokaComponent
+    moromiData={dataContext.moromiData}
+    josoHyokaList={dataContext.josoHyokaList}
+    staffList={dataContext.staffList}
+    saveJosoHyoka={dataContext.saveJosoHyoka}
+    currentBY={dataContext.currentBY}
   />
 )}
       </main>

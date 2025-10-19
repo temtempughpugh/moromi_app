@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty } from '../utils/database';
-import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty } from '../utils/types';
+import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty, JosoHyoka } from '../utils/types';
 import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 import {
   getAllStaff,
@@ -14,14 +14,16 @@ import {
   saveMemoRow as saveMemoRowToSupabase,
   getRiceDelivery,
   saveRiceDelivery as saveRiceDeliveryToSupabase,
-  getAllTasks,  // ← 追加
-  addTask as dbAddTask,  // ← 追加
-  updateTask as dbUpdateTask,  // ← 追加
-  deleteTask as dbDeleteTask,  // ← 追加
-  getOverdueTasks,  // ← 追加
-  getWeeklyDuties,  // ← 追加
-  saveWeeklyDuties as saveWeeklyDutiesToSupabase,  // ← 追加
-  getCurrentDutyStaff,  // ← 追加
+  getAllTasks,
+  addTask as dbAddTask,
+  updateTask as dbUpdateTask,
+  deleteTask as dbDeleteTask,
+  getOverdueTasks,
+  getWeeklyDuties,
+  saveWeeklyDuties as saveWeeklyDutiesToSupabase,
+  getCurrentDutyStaff,
+  getJosoHyokaByBY,
+  saveJosoHyoka as saveJosoHyokaToSupabase,
 } from '../utils/database';
 
 export function useData() {
@@ -40,22 +42,21 @@ export function useData() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  // タスク管理用state
-  // state追加（tasksの下に追加）
   const [tasks, setTasks] = useState<TaskManagement[]>([]);
-  const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
-  const [weeklyDuties, setWeeklyDuties] = useState<WeeklyDuty[]>([]);  // ← 追加
+const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
+const [weeklyDuties, setWeeklyDuties] = useState<WeeklyDuty[]>([]);
+const [josoHyokaList, setJosoHyokaList] = useState<JosoHyoka[]>([]);
 
   useEffect(() => {
     loadAllData();
   }, []);
 
-  // currentBY が変わったらデータ読み込み
-  useEffect(() => {
-    if (availableBYs.length > 0) {
-      loadMoromiByBY(currentBY);
-    }
-  }, [currentBY, availableBYs]);
+useEffect(() => {
+  if (availableBYs.length > 0) {
+    loadMoromiByBY(currentBY);
+    loadJosoHyoka();
+  }
+}, [currentBY, availableBYs]);
 
   useEffect(() => {
     loadShiftsByMonth(currentShiftMonth);
@@ -268,43 +269,64 @@ const saveShifts = async (shiftsData: Omit<Shift, 'createdAt' | 'updatedAt'>[]) 
     }
   };
 
-  const getCurrentDuty = (targetDate: Date): Staff | null => {
-    return getCurrentDutyStaff(weeklyDuties, targetDate, staffList);
-  };
+const getCurrentDuty = (targetDate: Date): Staff | null => {
+  return getCurrentDutyStaff(weeklyDuties, targetDate, staffList);
+};
 
-  return {
-    isLoading,
-    availableBYs,
-    currentBY,
-    setCurrentBY,
-    moromiData,
-    moromiProcesses,
-    getMoromiByBY,
-    getProcessesByMoromi,
-    getAllData,
-    saveMoromiData,
-    loadMoromiByBY,  // ← 追加
+const loadJosoHyoka = async () => {
+  try {
+    const data = await getJosoHyokaByBY(currentBY);
+    setJosoHyokaList(data);
+  } catch (error) {
+    console.error('上槽評価読み込みエラー:', error);
+  }
+};
+
+const saveJosoHyoka = async (hyoka: Omit<JosoHyoka, 'createdAt' | 'updatedAt'>) => {
+  try {
+    await saveJosoHyokaToSupabase(hyoka);
+    await loadJosoHyoka();
+  } catch (error) {
+    console.error('上槽評価保存エラー:', error);
+    throw error;
+  }
+};
+
+return {
+  isLoading,
+  availableBYs,
+  currentBY,
+  setCurrentBY,
+  moromiData,
+  moromiProcesses,
+  getMoromiByBY,
+  getProcessesByMoromi,
+  getAllData,
+  saveMoromiData,
+  loadMoromiByBY,
   staffList,
-    shifts,
-    monthlySettings,
-    memoRow,
-    riceDelivery,
-    currentShiftMonth,
-    setCurrentShiftMonth,
-    saveStaff,
-    deleteStaff,
-    saveShifts,
-    saveMonthlySettings,
-    saveMemoRow,
-    saveRiceDelivery,
-    tasks,
-    overdueTasks,
-    addTask,
-    updateTask,
-    deleteTask,
-    refreshTasks: loadAllTasks,
-    weeklyDuties,  // ← 追加
-    saveWeeklyDuties,  // ← 追加
-    getCurrentDuty,  // ← 追加
-  };
+  shifts,
+  monthlySettings,
+  memoRow,
+  riceDelivery,
+  currentShiftMonth,
+  setCurrentShiftMonth,
+  saveStaff,
+  deleteStaff,
+  saveShifts,
+  saveMonthlySettings,
+  saveMemoRow,
+  saveRiceDelivery,
+  tasks,
+  overdueTasks,
+  addTask,
+  updateTask,
+  deleteTask,
+  refreshTasks: loadAllTasks,
+  weeklyDuties,
+  saveWeeklyDuties,
+  getCurrentDuty,
+  josoHyokaList,
+  saveJosoHyoka,
+};
 }
