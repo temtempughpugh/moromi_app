@@ -372,13 +372,26 @@ alert('保存しました');
     const table = document.querySelector('.overflow-x-auto table');
     const clonedTable = table?.cloneNode(true) as HTMLTableElement;
     
-    // すべてのselect要素を選択されたテキストに置き換え
-    clonedTable?.querySelectorAll('select').forEach(select => {
-      const selectedText = select.options[select.selectedIndex]?.text || '';
-      const span = document.createElement('span');
-      span.textContent = selectedText;
-      select.replaceWith(span);
-    });
+  clonedTable?.querySelectorAll('select').forEach(select => {
+  const htmlSelect = select as HTMLSelectElement;
+  const value = htmlSelect.value;
+  let displayText = '';
+  
+  if (value) {
+    const [shiftType, workHours] = value.split('-');
+    if (workHours === 'rest') {
+      displayText = '休';
+    } else if (shiftType === 'early') {
+      displayText = `早${workHours}`;
+    } else {
+      displayText = workHours;
+    }
+  }
+  
+  const span = document.createElement('span');
+  span.textContent = displayText;
+  select.replaceWith(span);
+});
     
     // すべてのinput要素を値に置き換え
   // Replace input elements with their values
