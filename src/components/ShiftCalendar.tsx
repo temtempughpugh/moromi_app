@@ -181,7 +181,14 @@ export default function ShiftCalendar({
 
   const getShift = (staffId: string, date: string): Shift | null => {
     const key = `${staffId}-${date}`;
-    if (localShifts[key]) return localShifts[key];
+    const localShift = localShifts[key];
+    
+    // 削除マークがある場合はnullを返す
+    if (localShift && localShift.memo === '_DELETE_') {
+      return null;
+    }
+    
+    if (localShift) return localShift;
     return shifts.find(s => s.staffId === staffId && s.date === date) || null;
   };
 
@@ -189,11 +196,18 @@ export default function ShiftCalendar({
     const key = `${staffId}-${date}`;
     
     if (value === '') {
-      setLocalShifts(prev => {
-        const newShifts = { ...prev };
-        delete newShifts[key];
-        return newShifts;
-      });
+      // 空欄にする場合は、削除マークとして特別なShiftオブジェクトを保存
+      const deleteMarker: Shift = {
+        id: key,
+        date,
+        staffId,
+        shiftType: 'normal',
+        workHours: null,
+        memo: '_DELETE_',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setLocalShifts(prev => ({ ...prev, [key]: deleteMarker }));
       return;
     }
 
@@ -258,9 +272,14 @@ export default function ShiftCalendar({
         baseShiftsMap[key] = shift;
       });
 
-      // localShiftsで上書き（変更・追加分）
+      // localShiftsで上書き（変更・追加分）、削除マークがあるものは除外
       Object.entries(localShifts).forEach(([key, shift]) => {
-        baseShiftsMap[key] = shift;
+        if (shift.memo === '_DELETE_') {
+          // 削除マークがある場合は、baseShiftsMapから削除
+          delete baseShiftsMap[key];
+        } else {
+          baseShiftsMap[key] = shift;
+        }
       });
 
       const shiftsToSave = Object.values(baseShiftsMap);
