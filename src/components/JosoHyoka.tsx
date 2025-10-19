@@ -179,21 +179,24 @@ export default function JosoHyokaComponent({
                     <td className="px-4 py-3 border-r">{moromi.josoDate.substring(5)}</td>
                     <td className="px-2 py-2 border-r">
   <select
-    value={hyoka.rating || ''}
-    onChange={(e) => updateRating(
+  value={hyoka.rating || ''}
+  onChange={(e) => {
+    const value = e.target.value;
+    updateRating(
       moromi.jungoId, 
-      e.target.value ? e.target.value as 'S' | 'A' | 'B' | 'C' | 'D' : null
-    )}
-    onBlur={() => handleRatingBlur(moromi.jungoId)}
-    className="w-16 px-2 py-1 border rounded text-center font-bold text-sm"
-  >
-    <option value="">-</option>
-    <option value="S">S</option>
-    <option value="A">A</option>
-    <option value="B">B</option>
-    <option value="C">C</option>
-    <option value="D">D</option>
-  </select>
+      value === '' ? null : value as 'S' | 'A' | 'B' | 'C' | 'D'
+    );
+  }}
+  onBlur={() => handleRatingBlur(moromi.jungoId)}
+  className="w-16 px-2 py-1 border rounded text-center font-bold text-sm"
+>
+  <option value="">-</option>
+  <option value="S">S</option>
+  <option value="A">A</option>
+  <option value="B">B</option>
+  <option value="C">C</option>
+  <option value="D">D</option>
+</select>
 </td>
 {activeStaff.map(staff => (
   <td key={staff.id} className="px-2 py-2 border-r">
