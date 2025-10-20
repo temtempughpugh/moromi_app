@@ -5,7 +5,9 @@ import ShiftCalendar from './components/ShiftCalendar';
 import DekojiPage from './components/DekojiPage';
 import TaskManagement from './components/TaskManagement';  // ← 追加
 import JosoHyokaComponent from './components/JosoHyoka';
+import JosoCommentAlert from './components/JosoCommentAlert';
 import { useData } from './hooks/useData';
+
 
 
 
@@ -24,6 +26,7 @@ useEffect(() => {
 
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [showJosoAlert, setShowJosoAlert] = useState(true); // ← 追加
 const [dekojiDate, setDekojiDate] = useState<string>('');
   
   useEffect(() => {
@@ -72,7 +75,7 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl">
+        <nav className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-xl">
   <div className="container mx-auto px-4 md:px-6 py-4">
     <div className="flex justify-between items-center">
       {/* 左側 - タイトルと年度選択 */}
@@ -232,6 +235,19 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
     )}
   </div>
 </nav>
+
+{/* 上槽コメント未提出アラート */}
+      {showJosoAlert && (
+        <div className="container mx-auto px-4 pt-6">
+          <JosoCommentAlert
+            moromiData={dataContext.moromiData}
+            josoHyokaList={dataContext.josoHyokaList}
+            staffList={dataContext.staffList}
+            currentBY={dataContext.currentBY}
+            onClose={() => setShowJosoAlert(false)}
+          />
+        </div>
+      )}
 
       <main className="container mx-auto px-4 md:px-6 py-4 md:py-8">
         {currentPage === 'dashboard' && (
