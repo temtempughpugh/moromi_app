@@ -390,20 +390,22 @@ export default function ShiftCalendar({
               const table = document.querySelector('.overflow-x-auto table');
               const clonedTable = table?.cloneNode(true) as HTMLTableElement;
               
-              const originalSelects = table?.querySelectorAll('select');
-              const clonedSelects = clonedTable?.querySelectorAll('select');
+              const originalShiftSelects = table?.querySelectorAll('select');
+              const clonedShiftSelects = clonedTable?.querySelectorAll('select');
               
-              clonedSelects?.forEach((clonedSelect, index) => {
-                const originalSelect = originalSelects?.[index] as HTMLSelectElement;
+              clonedShiftSelects?.forEach((clonedSelect, index) => {
+                const originalSelect = originalShiftSelects?.[index] as HTMLSelectElement;
                 if (!originalSelect) return;
                 
                 const value = originalSelect.value;
                 let displayText = '';
+                let isRest = false;
                 
                 if (value) {
                   const [shiftType, workHours] = value.split('-');
                   if (workHours === 'rest') {
                     displayText = '休';
+                    isRest = true;
                   } else if (shiftType === 'early') {
                     displayText = workHours;
                   } else {
@@ -413,6 +415,9 @@ export default function ShiftCalendar({
                 
                 const span = document.createElement('span');
                 span.textContent = displayText;
+                if (isRest) {
+                  span.className = 'text-red-600 font-bold';
+                }
                 clonedSelect.replaceWith(span);
               });
               
@@ -426,6 +431,19 @@ export default function ShiftCalendar({
                 const span = document.createElement('span');
                 span.textContent = originalInput.value || originalInput.defaultValue || '';
                 clonedInput.replaceWith(span);
+              });
+              
+              const originalRiceSelects = table?.querySelectorAll('select.appearance-none:not(.w-full.text-center.border-0)');
+              const clonedRiceSelects = clonedTable?.querySelectorAll('select.appearance-none:not(.w-full.text-center.border-0)');
+              
+              clonedRiceSelects?.forEach((clonedSelect, index) => {
+                const originalSelect = originalRiceSelects?.[index] as HTMLSelectElement;
+                if (!originalSelect) return;
+                
+                const value = originalSelect.value;
+                const span = document.createElement('span');
+                span.textContent = value || '';
+                clonedSelect.replaceWith(span);
               });
               
               printWindow?.document.write(`
@@ -481,6 +499,8 @@ export default function ShiftCalendar({
                     .bg-green-50 { background-color: #f0fdf4 !important; }
                     .bg-blue-100 { background-color: #dbeafe !important; }
                     .bg-gray-100 { background-color: #f3f4f6 !important; }
+                    .text-red-600 { color: #dc2626 !important; }
+                    .font-bold { font-weight: 700 !important; }
                   </style>
                 </head>
                 <body onload="window.print(); window.close();">
@@ -574,7 +594,7 @@ export default function ShiftCalendar({
               {dates.map((date, i) => (
                 <td key={date} className={`border p-1 ${new Date(date).getDate() === 1 ? 'border-l-2 border-l-gray-800' : ''}`}>
                   <select
-                    className="w-full text-center bg-transparent text-[10px] appearance-none"
+                    className="rice-delivery-select w-full text-center bg-transparent text-[10px] appearance-none"
                     value={localRiceDeliveries[i] || riceDelivery?.deliveries[i] || ''}
                     onChange={(e) => {
                       const baseDeliveries = localRiceDeliveries.length > 0 
