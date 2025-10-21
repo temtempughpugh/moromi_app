@@ -147,7 +147,7 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
               : 'hover:bg-blue-800'
           }`}
         >
-          📋 タスク管理
+           タスク管理
         </button>
         <button
   onClick={() => setCurrentPage('joso-hyoka')}
