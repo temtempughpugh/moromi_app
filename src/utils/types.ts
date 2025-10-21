@@ -183,3 +183,23 @@ export interface JosoHyoka {
   createdAt: string;
   updatedAt: string;
 }
+
+// 作業タイプ
+// 作業タイプ
+export type WorkType = 'morning' | 'koshiki' | 'kasu';
+
+// 作業タイム記録
+export interface WorkTimeRecord {
+  id?: number;
+  date: string;
+  workType: WorkType;
+  staffNames: string;
+  startTime: string;
+  stopTime: string;
+  totalSeconds: number;
+  dekoji?: any;
+  shikomi?: any;
+  tasks?: any;
+  createdAt?: string;
+  updatedAt?: string;
+}

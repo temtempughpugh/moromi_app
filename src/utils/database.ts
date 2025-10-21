@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty, WeeklyDutyAction, JosoHyoka } from './types';
+import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty, WeeklyDutyAction, JosoHyoka,WorkTimeRecord,
+  WorkType } from './types';
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
@@ -760,6 +761,73 @@ export const saveWeeklyDutyAction = async (
 export const deleteWeeklyDutyAction = async (id: number): Promise<void> => {
   const { error } = await supabase
     .from('weekly_duty_actions')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};
+
+// ============================================
+// 作業タイム記録関連
+// ============================================
+
+export const getWorkTimeRecords = async (date: string, workType?: WorkType): Promise<WorkTimeRecord[]> => {
+  let query = supabase
+    .from('work_time_records')
+    .select('id, date, work_type, staff_names, start_time, stop_time, total_seconds, dekoji, shikomi, tasks, created_at, updated_at')
+    .eq('date', date)
+    .order('created_at', { ascending: false });
+
+  if (workType) {
+    query = query.eq('work_type', workType);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('getWorkTimeRecords エラー:', error);
+    throw error;
+  }
+
+  return (data || []).map(row => ({
+    id: row.id,
+    date: row.date,
+    workType: row.work_type || 'morning',
+    staffNames: row.staff_names || '',
+    startTime: row.start_time || '',
+    stopTime: row.stop_time || '',
+    totalSeconds: row.total_seconds || 0,
+    dekoji: row.dekoji,
+    shikomi: row.shikomi,
+    tasks: row.tasks,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const saveWorkTimeRecord = async (record: Omit<WorkTimeRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
+  
+  const { error } = await supabase
+    .from('work_time_records')
+    .insert({
+  date: record.date,
+  work_type: record.workType,
+  staff_names: record.staffNames,
+  start_time: record.startTime,
+  stop_time: record.stopTime,
+  total_seconds: record.totalSeconds,
+  dekoji: record.dekoji || null,
+  shikomi: record.shikomi || null,
+  tasks: record.tasks || null,
+  updated_at: new Date().toISOString(),
+});
+
+  if (error) throw error;
+};
+
+export const deleteWorkTimeRecord = async (id: number): Promise<void> => {
+  const { error } = await supabase
+    .from('work_time_records')
     .delete()
     .eq('id', id);
 

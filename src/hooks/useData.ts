@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty } from '../utils/database';
-import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty, WeeklyDutyAction, JosoHyoka } from '../utils/types';
+import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty,getWorkTimeRecords,
+  saveWorkTimeRecord as saveWorkTimeRecordToDatabase,
+  deleteWorkTimeRecord as deleteWorkTimeRecordFromDatabase } from '../utils/database';
+import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty, WeeklyDutyAction, JosoHyoka,WorkTimeRecord,
+  WorkType } from '../utils/types';
 import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 import {
   getAllStaff,
@@ -42,6 +45,7 @@ export function useData() {
   const [memoRow, setMemoRow] = useState<MemoRow | null>(null);
   const [riceDelivery, setRiceDelivery] = useState<RiceDelivery | null>(null);
   const [currentShiftMonth, setCurrentShiftMonth] = useState<string>(() => {
+    
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
@@ -51,6 +55,7 @@ const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
 const [weeklyDuties, setWeeklyDuties] = useState<WeeklyDuty[]>([]);
 const [weeklyDutyActions, setWeeklyDutyActions] = useState<WeeklyDutyAction[]>([]);
 const [josoHyokaList, setJosoHyokaList] = useState<JosoHyoka[]>([]);
+const [workTimeRecords, setWorkTimeRecords] = useState<WorkTimeRecord[]>([]);
 
   useEffect(() => {
     loadAllData();
@@ -336,6 +341,37 @@ const deleteWeeklyDutyAction = async (id: number) => {
   }
 };
 
+// ========== 作業タイム記録関連の関数 ==========
+const loadWorkTimeRecords = async (date: string, workType?: WorkType) => {
+  try {
+    const data = await getWorkTimeRecords(date, workType);
+    setWorkTimeRecords(data);
+  } catch (error) {
+    console.error('作業タイム記録読み込みエラー:', error);
+    setWorkTimeRecords([]);
+  }
+};
+
+const saveWorkTimeRecord = async (record: Omit<WorkTimeRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
+  try {
+    await saveWorkTimeRecordToDatabase(record);
+    await loadWorkTimeRecords(record.date);
+  } catch (error) {
+    console.error('作業タイム記録保存エラー:', error);
+    throw error;
+  }
+};
+
+const deleteWorkTimeRecord = async (id: number, date: string) => {
+  try {
+    await deleteWorkTimeRecordFromDatabase(id);
+    await loadWorkTimeRecords(date);
+  } catch (error) {
+    console.error('作業タイム記録削除エラー:', error);
+    throw error;
+  }
+};
+
 return {
   isLoading,
   availableBYs,
@@ -376,5 +412,9 @@ return {
   loadWeeklyDutyActionsByStaff,
   saveWeeklyDutyAction,
   deleteWeeklyDutyAction,
+  workTimeRecords,
+  loadWorkTimeRecords,
+  saveWorkTimeRecord,
+  deleteWorkTimeRecord,
 };
 }
