@@ -39,9 +39,13 @@ export default function WorkTimer({
   const [stopTime, setStopTime] = useState<string | null>(null);
   const [expandedRecordIndex, setExpandedRecordIndex] = useState<number | null>(null);
 
-  // 早番スタッフを取得
+  // 早番スタッフを取得（休みは除外）
   const getEarlyShiftStaff = (): Staff[] => {
-    const todayShifts = shifts.filter(s => s.date === currentDate && s.shiftType === 'early');
+    const todayShifts = shifts.filter(s => 
+      s.date === currentDate && 
+      s.shiftType === 'early' && 
+      s.workHours !== null
+    );
     return todayShifts
       .map(s => staffList.find(staff => staff.id === s.staffId))
       .filter((staff): staff is Staff => staff !== undefined);
