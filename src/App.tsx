@@ -6,12 +6,14 @@ import DekojiPage from './components/DekojiPage';
 import TaskManagement from './components/TaskManagement';  // ← 追加
 import JosoHyokaComponent from './components/JosoHyoka';
 import JosoCommentAlert from './components/JosoCommentAlert';
+import WeeklyDutyActions from './components/WeeklyDutyActions';  // ← 追加
 import { useData } from './hooks/useData';
 
 
 
 
-type Page = 'dashboard' | 'shift' | 'csv-update' | 'dekoji' | 'task-management' | 'joso-hyoka';
+type Page = 'dashboard' | 'shift' | 'csv-update' | 'dekoji' | 'task-management' | 'joso-hyoka' | 'weekly-duty-actions';
+
 export default function App() {
   const dataContext = useData();
 useEffect(() => {
@@ -24,6 +26,14 @@ useEffect(() => {
   return () => window.removeEventListener('navigateToDekojiPage', handleNavigate as EventListener);
 }, []);
 
+useEffect(() => {
+  const handleNavigateToWeeklyDuty = () => {
+    setCurrentPage('weekly-duty-actions');
+  };
+  
+  window.addEventListener('navigateToWeeklyDuty', handleNavigateToWeeklyDuty);
+  return () => window.removeEventListener('navigateToWeeklyDuty', handleNavigateToWeeklyDuty);
+}, []);
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [showJosoAlert, setShowJosoAlert] = useState(true); // ← 追加
@@ -139,16 +149,26 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
 >
   上槽一覧
 </button>
-        <button
-          onClick={() => setCurrentPage('csv-update')}
-          className={`px-4 py-2 rounded transition ${
-            currentPage === 'csv-update'
-              ? 'bg-white text-blue-900 font-bold'
-              : 'hover:bg-blue-800'
-          }`}
-        >
-          CSV更新
-        </button>
+<button
+  onClick={() => setCurrentPage('weekly-duty-actions')}
+  className={`px-4 py-2 rounded transition ${
+    currentPage === 'weekly-duty-actions'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'hover:bg-blue-800'
+  }`}
+>
+  📝 週番記録
+</button>
+<button
+  onClick={() => setCurrentPage('csv-update')}
+  className={`px-4 py-2 rounded transition ${
+    currentPage === 'csv-update'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'hover:bg-blue-800'
+  }`}
+>
+  CSV更新
+</button>
       </div>
 
       {/* スマホ版 - ハンバーガーメニューボタン */}
@@ -196,19 +216,6 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
           📅 シフト表
         </button>
         <button
-          onClick={() => {
-            setCurrentPage('task-management');
-            setIsMobileMenuOpen(false);
-          }}
-          className={`w-full text-left px-4 py-3 rounded transition ${
-            currentPage === 'task-management'
-              ? 'bg-white text-blue-900 font-bold'
-              : 'bg-blue-800 hover:bg-blue-700'
-          }`}
-        >
-          📋 タスク管理
-        </button>
-        <button
   onClick={() => {setCurrentPage('joso-hyoka'); setIsMobileMenuOpen(false);}}
   className={`w-full text-left px-4 py-3 rounded transition ${
     currentPage === 'joso-hyoka'
@@ -218,19 +225,32 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
 >
   🍶 上槽一覧
 </button>
-        <button
-          onClick={() => {
-            setCurrentPage('csv-update');
-            setIsMobileMenuOpen(false);
-          }}
-          className={`w-full text-left px-4 py-3 rounded transition ${
-            currentPage === 'csv-update'
-              ? 'bg-white text-blue-900 font-bold'
-              : 'bg-blue-800 hover:bg-blue-700'
-          }`}
-        >
-          📄 CSV更新
-        </button>
+<button
+  onClick={() => {
+    setCurrentPage('weekly-duty-actions');
+    setIsMobileMenuOpen(false);
+  }}
+  className={`w-full text-left px-4 py-3 rounded transition ${
+    currentPage === 'weekly-duty-actions'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'bg-blue-800 hover:bg-blue-700'
+  }`}
+>
+  📝 週番記録
+</button>
+<button
+  onClick={() => {
+    setCurrentPage('csv-update');
+    setIsMobileMenuOpen(false);
+  }}
+  className={`w-full text-left px-4 py-3 rounded transition ${
+    currentPage === 'csv-update'
+      ? 'bg-white text-blue-900 font-bold'
+      : 'bg-blue-800 hover:bg-blue-700'
+  }`}
+>
+  📄 CSV更新
+</button>
       </div>
     )}
   </div>
@@ -312,6 +332,16 @@ weeklyDuties={dataContext.weeklyDuties}
     staffList={dataContext.staffList}
     saveJosoHyoka={dataContext.saveJosoHyoka}
     currentBY={dataContext.currentBY}
+  />
+)}
+
+{currentPage === 'weekly-duty-actions' && (
+  <WeeklyDutyActions
+    staffList={dataContext.staffList}
+    loadWeeklyDutyActionsByStaff={dataContext.loadWeeklyDutyActionsByStaff}
+    saveWeeklyDutyAction={dataContext.saveWeeklyDutyAction}
+    deleteWeeklyDutyAction={dataContext.deleteWeeklyDutyAction}
+    getCurrentDuty={dataContext.getCurrentDuty}
   />
 )}
       </main>

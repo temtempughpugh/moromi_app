@@ -491,15 +491,21 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
               </div>
             )}
           </button>
-           {/* 週番表示 */}
-          {(() => {
-            const currentDutyStaff = dataContext.getCurrentDuty(currentDate);
-            return currentDutyStaff ? (
-              <div className="bg-white/20 px-4 py-2 rounded-lg">
-                <span className="text-sm font-semibold">週番: {currentDutyStaff.name}</span>
-              </div>
-            ) : null;
-          })()}
+           {/* 週番表示（クリック可能） */}
+{(() => {
+  const currentDutyStaff = dataContext.getCurrentDuty(currentDate);
+  return currentDutyStaff ? (
+    <button
+      onClick={() => {
+        // App.tsxのページ切り替え関数を呼び出すためにカスタムイベントを発火
+        window.dispatchEvent(new CustomEvent('navigateToWeeklyDuty'));
+      }}
+      className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+    >
+      <span className="text-sm font-semibold">週番: {currentDutyStaff.name}</span>
+    </button>
+  ) : null;
+})()}
           
           <button 
             onClick={() => changeDate(1)}

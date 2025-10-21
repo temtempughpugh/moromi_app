@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty } from '../utils/database';
-import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty, JosoHyoka } from '../utils/types';
+import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty, WeeklyDutyAction, JosoHyoka } from '../utils/types';
 import type { Staff, Shift, MonthlySettings, MemoRow, RiceDelivery } from '../utils/types';
 import {
   getAllStaff,
@@ -24,6 +24,10 @@ import {
   getCurrentDutyStaff,
   getJosoHyokaByBY,
   saveJosoHyoka as saveJosoHyokaToSupabase,
+  getWeeklyDutyActions,
+  getWeeklyDutyActionsByStaff,
+  saveWeeklyDutyAction as saveWeeklyDutyActionToSupabase,
+  deleteWeeklyDutyAction as deleteWeeklyDutyActionFromSupabase,
 } from '../utils/database';
 
 export function useData() {
@@ -45,6 +49,7 @@ export function useData() {
   const [tasks, setTasks] = useState<TaskManagement[]>([]);
 const [overdueTasks, setOverdueTasks] = useState<OverdueTask[]>([]);
 const [weeklyDuties, setWeeklyDuties] = useState<WeeklyDuty[]>([]);
+const [weeklyDutyActions, setWeeklyDutyActions] = useState<WeeklyDutyAction[]>([]);
 const [josoHyokaList, setJosoHyokaList] = useState<JosoHyoka[]>([]);
 
   useEffect(() => {
@@ -55,6 +60,7 @@ useEffect(() => {
   if (availableBYs.length > 0) {
     loadMoromiByBY(currentBY);
     loadJosoHyoka();
+    loadWeeklyDutyActions();  // ← この行を追加
   }
 }, [currentBY, availableBYs]);
 
@@ -292,6 +298,44 @@ const saveJosoHyoka = async (hyoka: Omit<JosoHyoka, 'createdAt' | 'updatedAt'>) 
   }
 };
 
+const loadWeeklyDutyActions = async () => {
+  try {
+    const data = await getWeeklyDutyActions();
+    setWeeklyDutyActions(data);
+  } catch (error) {
+    console.error('週番アクション記録読み込みエラー:', error);
+  }
+};
+
+const loadWeeklyDutyActionsByStaff = async (staffId: string): Promise<WeeklyDutyAction[]> => {
+  try {
+    return await getWeeklyDutyActionsByStaff(staffId);
+  } catch (error) {
+    console.error('週番アクション記録読み込みエラー:', error);
+    return [];
+  }
+};
+
+const saveWeeklyDutyAction = async (action: Omit<WeeklyDutyAction, 'id' | 'createdAt' | 'updatedAt'>) => {
+  try {
+    await saveWeeklyDutyActionToSupabase(action);
+    await loadWeeklyDutyActions();
+  } catch (error) {
+    console.error('週番アクション記録保存エラー:', error);
+    throw error;
+  }
+};
+
+const deleteWeeklyDutyAction = async (id: number) => {
+  try {
+    await deleteWeeklyDutyActionFromSupabase(id);
+    await loadWeeklyDutyActions();
+  } catch (error) {
+    console.error('週番アクション記録削除エラー:', error);
+    throw error;
+  }
+};
+
 return {
   isLoading,
   availableBYs,
@@ -328,5 +372,9 @@ return {
   getCurrentDuty,
   josoHyokaList,
   saveJosoHyoka,
+  weeklyDutyActions,
+  loadWeeklyDutyActionsByStaff,
+  saveWeeklyDutyAction,
+  deleteWeeklyDutyAction,
 };
 }

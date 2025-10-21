@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty, JosoHyoka } from './types';
+import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, TaskManagement, WeeklyDuty, WeeklyDutyAction, JosoHyoka } from './types';
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
@@ -673,4 +673,95 @@ export const getCurrentDutyStaff = (
 
   // スタッフを検索
   return staffList.find(s => s.id === currentDuty.staffId) || null;
+};
+
+// 週番アクション記録を取得
+export const getWeeklyDutyActions = async (): Promise<WeeklyDutyAction[]> => {
+  const { data, error } = await supabase
+    .from('weekly_duty_actions')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    id: row.id,
+    staffId: row.staff_id,
+    date: row.date,
+    action: row.action,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+// 特定スタッフのアクション記録を取得
+export const getWeeklyDutyActionsByStaff = async (staffId: string): Promise<WeeklyDutyAction[]> => {
+  const { data, error } = await supabase
+    .from('weekly_duty_actions')
+    .select('*')
+    .eq('staff_id', staffId)
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    id: row.id,
+    staffId: row.staff_id,
+    date: row.date,
+    action: row.action,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+// 週番アクション記録を保存
+export const saveWeeklyDutyAction = async (
+  action: Omit<WeeklyDutyAction, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<void> => {
+  // 同じ日付・スタッフのアクションが既に存在するかチェック
+  const { data: existing, error: checkError } = await supabase
+    .from('weekly_duty_actions')
+    .select('id')
+    .eq('staff_id', action.staffId)
+    .eq('date', action.date)
+    .single();
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    throw checkError;
+  }
+
+  if (existing) {
+    // 更新
+    const { error } = await supabase
+      .from('weekly_duty_actions')
+      .update({
+        action: action.action,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+
+    if (error) throw error;
+  } else {
+    // 新規追加
+    const { error } = await supabase
+      .from('weekly_duty_actions')
+      .insert({
+        staff_id: action.staffId,
+        date: action.date,
+        action: action.action,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) throw error;
+  }
+};
+
+// 週番アクション記録を削除
+export const deleteWeeklyDutyAction = async (id: number): Promise<void> => {
+  const { error } = await supabase
+    .from('weekly_duty_actions')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
 };

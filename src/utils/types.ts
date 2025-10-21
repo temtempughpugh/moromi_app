@@ -164,6 +164,16 @@ export interface WeeklyDuty {
   updatedAt: string;
 }
 
+// 週番アクション記録
+export interface WeeklyDutyAction {
+  id: number;
+  staffId: string;
+  date: string; // YYYY-MM-DD形式
+  action: string; // 最大200文字
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 上槽評価データ
 export interface JosoHyoka {
   by: number;
