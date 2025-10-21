@@ -31,6 +31,7 @@ export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData,
   const [showCalendar, setShowCalendar] = useState(false);
   const [expandedJungo, setExpandedJungo] = useState<string | null>(null);
   const [processes, setProcesses] = useState<{ [key: string]: MoromiProcess[] }>({});
+  const getCurrentDuty = dataContext?.getCurrentDuty || (() => null);
 
   const formatDate = (date: Date): string => {
     const days = ['日', '月', '火', '水', '木', '金', '土'];
@@ -479,31 +480,176 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
             <span className="text-xl">←</span>
           </button>
           
-          <button
-            onClick={() => setShowCalendar(!showCalendar)}
-            className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors relative"
-          >
-            <span className="text-lg font-semibold">本日（{formatDate(currentDate)}）</span>
-            
-            {showCalendar && (
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-white text-gray-800 p-4 rounded-lg shadow-xl z-10">
-                <p className="text-sm">カレンダー機能（実装予定）</p>
+          <div className="relative">
+  <button
+    onClick={() => setShowCalendar(!showCalendar)}
+    className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors"
+  >
+    <span className="text-lg font-semibold">📅 {formatDate(currentDate)}</span>
+  </button>
+  
+  {showCalendar && (
+    <>
+      {/* 背景オーバーレイ */}
+      <div 
+        className="fixed inset-0 z-40"
+        onClick={() => setShowCalendar(false)}
+      />
+      
+      {/* カレンダー本体 */}
+      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-3 bg-white text-gray-800 rounded-2xl shadow-2xl z-50 border-2 border-gray-100 min-w-[350px]">
+        <div className="p-6">
+          {/* ヘッダー */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => {
+                const newDate = new Date(currentDate);
+                newDate.setMonth(newDate.getMonth() - 1);
+                setCurrentDate(newDate);
+              }}
+              className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="font-bold text-xl text-gray-800">
+              {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
+            </div>
+            <button
+              onClick={() => {
+                const newDate = new Date(currentDate);
+                newDate.setMonth(newDate.getMonth() + 1);
+                setCurrentDate(newDate);
+              }}
+              className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* 曜日ヘッダー */}
+          <div className="grid grid-cols-7 gap-2 mb-3">
+            {['日', '月', '火', '水', '木', '金', '土'].map((day, i) => (
+              <div 
+                key={day} 
+                className={`text-center text-sm font-bold py-2 ${
+                  i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-700'
+                }`}
+              >
+                {day}
               </div>
-            )}
-          </button>
+            ))}
+          </div>
+          
+          {/* カレンダー日付 */}
+          <div className="grid grid-cols-7 gap-2">
+            {(() => {
+              const year = currentDate.getFullYear();
+              const month = currentDate.getMonth();
+              const firstDay = new Date(year, month, 1).getDay();
+              const lastDate = new Date(year, month + 1, 0).getDate();
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const selectedDate = new Date(currentDate);
+              selectedDate.setHours(0, 0, 0, 0);
+              
+              const days = [];
+              
+              // 前月の空白
+              for (let i = 0; i < firstDay; i++) {
+                days.push(
+                  <div key={`empty-${i}`} className="h-10" />
+                );
+              }
+              
+              // 日付
+              for (let day = 1; day <= lastDate; day++) {
+                const dateObj = new Date(year, month, day);
+                dateObj.setHours(0, 0, 0, 0);
+                const isToday = dateObj.getTime() === today.getTime();
+                const isSelected = dateObj.getTime() === selectedDate.getTime();
+                const dayOfWeek = dateObj.getDay();
+                
+                days.push(
+                  <button
+                    key={day}
+                    onClick={() => {
+                      const newDate = new Date(year, month, day);
+                      setCurrentDate(newDate);
+                      setShowCalendar(false);
+                    }}
+                    className={`
+                      h-10 text-base rounded-lg flex items-center justify-center transition-all font-medium
+                      ${isSelected 
+                        ? 'bg-blue-600 text-white shadow-lg scale-105' 
+                        : isToday 
+                          ? 'bg-blue-100 text-blue-700 font-bold ring-2 ring-blue-300' 
+                          : 'hover:bg-gray-100'
+                      }
+                      ${!isSelected && !isToday && (
+                        dayOfWeek === 0 ? 'text-red-500' : 
+                        dayOfWeek === 6 ? 'text-blue-500' : 
+                        'text-gray-700'
+                      )}
+                    `}
+                  >
+                    {day}
+                  </button>
+                );
+              }
+              
+              return days;
+            })()}
+          </div>
+          
+          {/* フッター */}
+          <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
+            <button
+              onClick={() => {
+                setCurrentDate(new Date());
+                setShowCalendar(false);
+              }}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-bold text-sm shadow-md hover:shadow-lg transition-all"
+            >
+              今日に戻る
+            </button>
+            <button
+              onClick={() => setShowCalendar(false)}
+              className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold text-sm transition-all"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+</div>
            {/* 週番表示（クリック可能） */}
 {(() => {
-  const currentDutyStaff = dataContext.getCurrentDuty(currentDate);
+  const currentDutyStaff = getCurrentDuty(currentDate);
   return currentDutyStaff ? (
-    <button
-      onClick={() => {
-        // App.tsxのページ切り替え関数を呼び出すためにカスタムイベントを発火
-        window.dispatchEvent(new CustomEvent('navigateToWeeklyDuty'));
-      }}
-      className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
-    >
-      <span className="text-sm font-semibold">週番: {currentDutyStaff.name}</span>
-    </button>
+    <div className="flex gap-2">
+      <button
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent('navigateToWeeklyDuty'));
+        }}
+        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+      >
+        <span className="text-sm font-semibold">週番: {currentDutyStaff.name}</span>
+      </button>
+      <button
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent('navigateToWorkTimer'));
+        }}
+        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+      >
+        <span className="text-sm font-semibold">⏱️ タイム</span>
+      </button>
+    </div>
   ) : null;
 })()}
           

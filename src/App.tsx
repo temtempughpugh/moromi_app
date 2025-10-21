@@ -7,12 +7,13 @@ import TaskManagement from './components/TaskManagement';  // ← 追加
 import JosoHyokaComponent from './components/JosoHyoka';
 import JosoCommentAlert from './components/JosoCommentAlert';
 import WeeklyDutyActions from './components/WeeklyDutyActions';  // ← 追加
+import WorkTimer from './components/WorkTimer';
 import { useData } from './hooks/useData';
 
 
 
 
-type Page = 'dashboard' | 'shift' | 'csv-update' | 'dekoji' | 'task-management' | 'joso-hyoka' | 'weekly-duty-actions';
+type Page = 'dashboard' | 'shift' | 'csv-update' | 'dekoji' | 'task-management' | 'joso-hyoka' | 'weekly-duty-actions' | 'work-timer';
 
 export default function App() {
   const dataContext = useData();
@@ -30,9 +31,18 @@ useEffect(() => {
   const handleNavigateToWeeklyDuty = () => {
     setCurrentPage('weekly-duty-actions');
   };
-  
+
+  const handleNavigateToWorkTimer = () => {
+    setCurrentPage('work-timer');
+  };
+
   window.addEventListener('navigateToWeeklyDuty', handleNavigateToWeeklyDuty);
-  return () => window.removeEventListener('navigateToWeeklyDuty', handleNavigateToWeeklyDuty);
+  window.addEventListener('navigateToWorkTimer', handleNavigateToWorkTimer);
+
+  return () => {
+    window.removeEventListener('navigateToWeeklyDuty', handleNavigateToWeeklyDuty);
+    window.removeEventListener('navigateToWorkTimer', handleNavigateToWorkTimer);
+  };
 }, []);
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
@@ -342,6 +352,18 @@ weeklyDuties={dataContext.weeklyDuties}
     saveWeeklyDutyAction={dataContext.saveWeeklyDutyAction}
     deleteWeeklyDutyAction={dataContext.deleteWeeklyDutyAction}
     getCurrentDuty={dataContext.getCurrentDuty}
+  />
+)}
+
+{currentPage === 'work-timer' && (
+  <WorkTimer
+    staffList={dataContext.staffList}
+    shifts={dataContext.shifts}
+    moromiData={dataContext.moromiData}
+    moromiProcesses={dataContext.moromiProcesses}
+    tasks={dataContext.tasks}
+    currentBY={dataContext.currentBY}
+    onBack={() => setCurrentPage('dashboard')}
   />
 )}
       </main>
