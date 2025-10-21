@@ -160,16 +160,6 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
   上槽一覧
 </button>
 <button
-  onClick={() => setCurrentPage('weekly-duty-actions')}
-  className={`px-4 py-2 rounded transition ${
-    currentPage === 'weekly-duty-actions'
-      ? 'bg-white text-blue-900 font-bold'
-      : 'hover:bg-blue-800'
-  }`}
->
-  📝 週番記録
-</button>
-<button
   onClick={() => setCurrentPage('csv-update')}
   className={`px-4 py-2 rounded transition ${
     currentPage === 'csv-update'
