@@ -114,25 +114,38 @@ const kasuRecords = dataContext.workTimeRecords.filter((r: WorkTimeRecord) => r.
 
   // 本日のタスクを取得
   const getTodayTasks = () => {
-    const tomorrow = new Date(currentDate);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    const taskList: string[] = [];
+  const tomorrow = new Date(currentDate);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const taskList: string[] = [];
 
-    moromiData.forEach(m => {
-      if (m.by !== currentBY) return;
-      if (m.motoOroshiDate === tomorrowStr) {
-        const tankId = m.soeTankId || m.tankNo;
-        taskList.push(`タンク洗い: ${m.jungoId}号 No.${tankId}`);
-      }
-      if (m.motoOroshiDate === currentDate) {
-        const tankId = m.soeTankId || m.tankNo;
-        taskList.push(`タンクに湯: ${m.jungoId}号 No.${tankId}`);
-      }
-      if (m.josoDate === tomorrowStr) {
-        taskList.push(`マット洗い: ${m.jungoId}号 No.${m.tankNo}`);
-      }
-    });
+  moromiData.forEach(m => {
+    if (m.by !== currentBY) return;
+    
+    // タンク洗い（翌日がモト卸し）
+    if (m.motoOroshiDate === tomorrowStr) {
+      const tankId = m.soeTankId || m.tankNo;
+      const tankType = m.soeTankId ? '添タンク' : '仕込みタンク';
+      taskList.push(`タンク洗い(${tankType}): ${m.jungoId}号 No.${tankId}`);
+    }
+    
+    // タンクに湯（当日がモト卸し）
+    if (m.motoOroshiDate === currentDate) {
+      const tankId = m.soeTankId || m.tankNo;
+      const tankType = m.soeTankId ? '添タンク' : '仕込みタンク';
+      taskList.push(`タンクに湯(${tankType}): ${m.jungoId}号 No.${tankId}`);
+    }
+    
+    // タンクに湯（当日が打ち込み日 かつ 添タンクがある場合は仕込みタンクに湯）
+    if (m.uchikomiDate === currentDate && m.soeTankId) {
+      taskList.push(`タンクに湯(仕込みタンク): ${m.jungoId}号 No.${m.tankNo}`);
+    }
+    
+    // マット洗い
+    if (m.josoDate === tomorrowStr) {
+      taskList.push(`マット洗い: ${m.jungoId}号 No.${m.tankNo}`);
+    }
+  });
 
     return taskList;
   };
