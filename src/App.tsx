@@ -347,6 +347,7 @@ weeklyDuties={dataContext.weeklyDuties}
 
 {currentPage === 'work-timer' && (
   <WorkTimer
+   key={new Date().toISOString().split('T')[0]}
     staffList={dataContext.staffList}
     shifts={dataContext.shifts}
     moromiData={dataContext.moromiData}
