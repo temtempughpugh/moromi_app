@@ -1,6 +1,6 @@
 // src/components/WorkTimer.tsx
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Staff, Shift, MoromiData, MoromiProcess, WorkTimeRecord } from '../utils/types';
 import { KojiService } from '../services/KojiService';
 import { useData } from '../hooks/useData';
@@ -24,15 +24,17 @@ export default function WorkTimer({
   onBack
 }: WorkTimerProps) {
   const dataContext = useData();
-  const [currentDate] = useState(() => new Date().toISOString().split('T')[0]);
+  
+  // ✅ Date型でcurrentDateを管理
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  
+  // ✅ 記録をローカルstateで管理（削除されない）
+  const [allRecords, setAllRecords] = useState<WorkTimeRecord[]>([]);
   
   // 各作業タイプごとのタイマー状態
   const [morningStartTime, setMorningStartTime] = useState<string | null>(null);
-  const [morningStopTime, setMorningStopTime] = useState<string | null>(null);
   const [koshikiStartTime, setKoshikiStartTime] = useState<string | null>(null);
-  const [koshikiStopTime, setKoshikiStopTime] = useState<string | null>(null);
   const [kasuStartTime, setKasuStartTime] = useState<string | null>(null);
-  const [kasuStopTime, setKasuStopTime] = useState<string | null>(null);
   
   // 各作業タイプごとの展開状態
   const [morningExpanded, setMorningExpanded] = useState(true);
@@ -48,33 +50,73 @@ export default function WorkTimer({
   const [koshikiDropdownOpen, setKoshikiDropdownOpen] = useState(false);
   const [kasuDropdownOpen, setKasuDropdownOpen] = useState(false);
 
-  // データ読み込み
-  useEffect(() => {
-    dataContext.loadWorkTimeRecords(currentDate);
+  // ✅ 文字列形式の日付を取得（データ取得や保存に使用）
+  const currentDateStr = useMemo(() => {
+    return currentDate.toISOString().split('T')[0];
   }, [currentDate]);
 
-  // 記録をタイプ別に分類
- const morningRecords = dataContext.workTimeRecords.filter((r: WorkTimeRecord) => r.workType === 'morning');
-const koshikiRecords = dataContext.workTimeRecords.filter((r: WorkTimeRecord) => r.workType === 'koshiki');
-const kasuRecords = dataContext.workTimeRecords.filter((r: WorkTimeRecord) => r.workType === 'kasu');
+  // ✅ 初回マウント時にSupabaseから全記録を直接取得
+  useEffect(() => {
+    const loadAllRecords = async () => {
+      try {
+        // Supabaseから全期間の記録を取得
+        const { supabase } = await import('../lib/supabase');
+        const { data, error } = await supabase
+          .from('work_time_records')
+          .select('id, date, work_type, staff_names, start_time, stop_time, total_seconds, dekoji, shikomi, tasks, created_at, updated_at')
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false });
 
-  // 早番スタッフを取得（休みは除外）
-  const getEarlyShiftStaff = (): Staff[] => {
+        if (error) {
+          console.error('全記録取得エラー:', error);
+          return;
+        }
+
+        if (data) {
+          const records: WorkTimeRecord[] = data.map(row => ({
+            id: row.id,
+            date: row.date,
+            workType: row.work_type || 'morning',
+            staffNames: row.staff_names || '',
+            startTime: row.start_time || '',
+            stopTime: row.stop_time || '',
+            totalSeconds: row.total_seconds || 0,
+            dekoji: row.dekoji,
+            shikomi: row.shikomi,
+            tasks: row.tasks,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }));
+          setAllRecords(records);
+        }
+      } catch (error) {
+        console.error('記録読み込みエラー:', error);
+      }
+    };
+    loadAllRecords();
+  }, []); // 初回のみ実行
+
+  // 記録をタイプ別に分類（allRecordsから）
+  const morningRecords = allRecords.filter((r: WorkTimeRecord) => r.workType === 'morning');
+  const koshikiRecords = allRecords.filter((r: WorkTimeRecord) => r.workType === 'koshiki');
+  const kasuRecords = allRecords.filter((r: WorkTimeRecord) => r.workType === 'kasu');
+
+  // ✅ 早番スタッフを取得（useMemoで依存関係管理）
+  const earlyStaff = useMemo((): Staff[] => {
     const todayShifts = shifts.filter(s => 
-      s.date === currentDate && 
+      s.date === currentDateStr && 
       s.shiftType === 'early' && 
       s.workHours !== null
     );
     return todayShifts
       .map(s => staffList.find(staff => staff.id === s.staffId))
       .filter((staff): staff is Staff => staff !== undefined);
-  };
+  }, [shifts, staffList, currentDateStr]);
 
-  const earlyStaff = getEarlyShiftStaff();
   const activeStaffList = staffList.filter(s => s.isActive);
 
-  // 前日の出麹を取得
-  const getYesterdayDekoji = () => {
+  // ✅ 前日の出麹を取得（useMemoで依存関係管理）
+  const yesterdayDekoji = useMemo(() => {
     const yesterday = new Date(currentDate);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
@@ -99,69 +141,56 @@ const kasuRecords = dataContext.workTimeRecords.filter((r: WorkTimeRecord) => r.
 
       return { ...koji, storageType };
     });
-  };
+  }, [moromiProcesses, currentDate, currentBY]);
 
-  // 本日の仲・留仕込みを取得
-  const getTodayNakaTomeShikomi = () => {
+  // ✅ 本日の仲・留仕込みを取得（useMemoで依存関係管理）
+  const todayShikomi = useMemo(() => {
     return moromiData.filter(m => {
       if (m.by !== currentBY) return false;
-      return m.nakaShikomiDate === currentDate || m.tomeShikomiDate === currentDate;
+      return m.nakaShikomiDate === currentDateStr || m.tomeShikomiDate === currentDateStr;
     }).map(m => ({
       ...m,
-      status: m.nakaShikomiDate === currentDate ? '仲' : '留'
+      status: m.nakaShikomiDate === currentDateStr ? '仲' : '留'
     }));
-  };
+  }, [moromiData, currentDateStr, currentBY]);
 
-  // 本日のタスクを取得
-  // 本日のタスクを取得
-const getTodayTasks = () => {
-  const tomorrow = new Date(currentDate);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const taskList: string[] = [];
-  
-  // isSameDate関数を追加
-  const isSameDate = (date1: string | Date, date2: string | Date): boolean => {
-    const d1 = typeof date1 === 'string' ? new Date(date1) : date1;
-    const d2 = typeof date2 === 'string' ? new Date(date2) : date2;
-    return d1.toDateString() === d2.toDateString();
-  };
-  
-  const currentDateObj = new Date(currentDate);
+  // ✅ 本日のタスクを取得（useMemoで依存関係管理）
+  const todayTasksList = useMemo(() => {
+    const tomorrow = new Date(currentDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const taskList: string[] = [];
 
-  moromiData.forEach(m => {
-    if (m.by !== currentBY) return;
-    
-    // タンク洗い（翌日がモト卸し）
-    if (isSameDate(m.motoOroshiDate, tomorrow)) {
-      const tankId = m.soeTankId || m.tankNo;
-      const tankType = m.soeTankId ? '添タンク' : '仕込みタンク';
-      taskList.push(`タンク洗い(${tankType}): ${m.jungoId}号 No.${tankId}`);
-    }
-    
-    // タンクに湯（当日がモト卸し）
-    if (isSameDate(m.motoOroshiDate, currentDateObj)) {
-      const tankId = m.soeTankId || m.tankNo;
-      const tankType = m.soeTankId ? '添タンク' : '仕込みタンク';
-      taskList.push(`タンクに湯(${tankType}): ${m.jungoId}号 No.${tankId}`);
-    }
-    
-    // タンクに湯（当日が打ち込み日 かつ 添タンクがある場合は仕込みタンクに湯）
-    if (isSameDate(m.uchikomiDate, currentDateObj) && m.soeTankId) {
-      taskList.push(`タンクに湯(仕込みタンク): ${m.jungoId}号 No.${m.tankNo}`);
-    }
-    
-    // マット洗い
-    if (isSameDate(m.josoDate, tomorrow)) {
-      taskList.push(`マット洗い: ${m.jungoId}号 No.${m.tankNo}`);
-    }
-  });
+    moromiData.forEach(m => {
+      if (m.by !== currentBY) return;
+      
+      // タンク洗い（翌日がモト卸し）
+      if (m.motoOroshiDate === tomorrowStr) {
+        const tankId = m.soeTankId || m.tankNo;
+        const tankType = m.soeTankId ? '添タンク' : '仕込みタンク';
+        taskList.push(`タンク洗い(${tankType}): ${m.jungoId}号 No.${tankId}`);
+      }
+      
+      // タンクに湯（当日がモト卸し）
+      if (m.motoOroshiDate === currentDateStr) {
+        const tankId = m.soeTankId || m.tankNo;
+        const tankType = m.soeTankId ? '添タンク' : '仕込みタンク';
+        taskList.push(`タンクに湯(${tankType}): ${m.jungoId}号 No.${tankId}`);
+      }
+      
+      // タンクに湯（当日が打ち込み日 かつ 添タンクがある場合は仕込みタンクに湯）
+      if (m.uchikomiDate === currentDateStr && m.soeTankId) {
+        taskList.push(`タンクに湯(仕込みタンク): ${m.jungoId}号 No.${m.tankNo}`);
+      }
+      
+      // マット洗い
+      if (m.josoDate === tomorrowStr) {
+        taskList.push(`マット洗い: ${m.jungoId}号 No.${m.tankNo}`);
+      }
+    });
 
-  return taskList;
-};
-
-  const yesterdayDekoji = getYesterdayDekoji();
-  const todayShikomi = getTodayNakaTomeShikomi();
-  const todayTasksList = getTodayTasks();
+    return taskList;
+  }, [moromiData, currentDate, currentBY, currentDateStr]);
 
   const getProcessName = (processType: string): string => {
     const map: { [key: string]: string } = {
@@ -173,40 +202,45 @@ const getTodayTasks = () => {
   const formatTime = (seconds: number): string => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${h}h${m}m`;
   };
 
   const formatTimeOnly = (timeStr: string): string => {
     const date = new Date(timeStr);
-    return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
+  const formatDisplayDate = (date: Date): string => {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
     const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-    return `${date.getMonth() + 1}/${date.getDate()}(${weekdays[date.getDay()]})`;
+    const weekday = weekdays[date.getDay()];
+    return `${month}/${day}(${weekday})`;
+  };
+
+  const changeDate = (days: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + days);
+    setCurrentDate(newDate);
   };
 
   // 午前作業のハンドラー
   const handleMorningStart = () => {
     const now = new Date().toISOString();
     setMorningStartTime(now);
-    setMorningStopTime(null);
   };
 
   const handleMorningStop = async () => {
     if (!morningStartTime) return;
     
     const now = new Date().toISOString();
-    setMorningStopTime(now);
     
     const start = new Date(morningStartTime).getTime();
     const stop = new Date(now).getTime();
     const totalSeconds = Math.floor((stop - start) / 1000);
     
     const record: Omit<WorkTimeRecord, 'id' | 'createdAt' | 'updatedAt'> = {
-      date: currentDate,
+      date: currentDateStr,
       workType: 'morning',
       staffNames: earlyStaff.map(s => s.name).join('、') || '未設定',
       startTime: morningStartTime,
@@ -219,8 +253,35 @@ const getTodayTasks = () => {
     
     try {
       await dataContext.saveWorkTimeRecord(record);
+      
+      // Supabaseから最新の1件を取得してallRecordsに追加
+      const { supabase } = await import('../lib/supabase');
+      const { data } = await supabase
+        .from('work_time_records')
+        .select('*')
+        .eq('date', currentDateStr)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const newRecord: WorkTimeRecord = {
+          id: data[0].id,
+          date: data[0].date,
+          workType: data[0].work_type || 'morning',
+          staffNames: data[0].staff_names || '',
+          startTime: data[0].start_time || '',
+          stopTime: data[0].stop_time || '',
+          totalSeconds: data[0].total_seconds || 0,
+          dekoji: data[0].dekoji,
+          shikomi: data[0].shikomi,
+          tasks: data[0].tasks,
+          createdAt: data[0].created_at,
+          updatedAt: data[0].updated_at,
+        };
+        setAllRecords(prev => [newRecord, ...prev]);
+      }
+      
       setMorningStartTime(null);
-      setMorningStopTime(null);
     } catch (error) {
       console.error('午前作業記録保存エラー:', error);
       alert('記録の保存に失敗しました');
@@ -231,25 +292,21 @@ const getTodayTasks = () => {
   const handleKoshikiStart = () => {
     const now = new Date().toISOString();
     setKoshikiStartTime(now);
-    setKoshikiStopTime(null);
   };
 
   const handleKoshikiStop = async () => {
     if (!koshikiStartTime) return;
     
     const now = new Date().toISOString();
-    setKoshikiStopTime(now);
     
     const start = new Date(koshikiStartTime).getTime();
     const stop = new Date(now).getTime();
     const totalSeconds = Math.floor((stop - start) / 1000);
     
     const record: Omit<WorkTimeRecord, 'id' | 'createdAt' | 'updatedAt'> = {
-      date: currentDate,
+      date: currentDateStr,
       workType: 'koshiki',
-      staffNames: koshikiSelectedStaff.map(id => 
-        activeStaffList.find(s => s.id === id)?.name
-      ).filter(Boolean).join('、') || '未設定',
+      staffNames: koshikiSelectedStaff.join('、') || '未設定',
       startTime: koshikiStartTime,
       stopTime: now,
       totalSeconds: totalSeconds
@@ -257,8 +314,35 @@ const getTodayTasks = () => {
     
     try {
       await dataContext.saveWorkTimeRecord(record);
+      
+      // Supabaseから最新の1件を取得してallRecordsに追加
+      const { supabase } = await import('../lib/supabase');
+      const { data } = await supabase
+        .from('work_time_records')
+        .select('*')
+        .eq('date', currentDateStr)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const newRecord: WorkTimeRecord = {
+          id: data[0].id,
+          date: data[0].date,
+          workType: data[0].work_type || 'koshiki',
+          staffNames: data[0].staff_names || '',
+          startTime: data[0].start_time || '',
+          stopTime: data[0].stop_time || '',
+          totalSeconds: data[0].total_seconds || 0,
+          dekoji: data[0].dekoji,
+          shikomi: data[0].shikomi,
+          tasks: data[0].tasks,
+          createdAt: data[0].created_at,
+          updatedAt: data[0].updated_at,
+        };
+        setAllRecords(prev => [newRecord, ...prev]);
+      }
+      
       setKoshikiStartTime(null);
-      setKoshikiStopTime(null);
     } catch (error) {
       console.error('甑準備作業記録保存エラー:', error);
       alert('記録の保存に失敗しました');
@@ -269,25 +353,21 @@ const getTodayTasks = () => {
   const handleKasuStart = () => {
     const now = new Date().toISOString();
     setKasuStartTime(now);
-    setKasuStopTime(null);
   };
 
   const handleKasuStop = async () => {
     if (!kasuStartTime) return;
     
     const now = new Date().toISOString();
-    setKasuStopTime(now);
     
     const start = new Date(kasuStartTime).getTime();
     const stop = new Date(now).getTime();
     const totalSeconds = Math.floor((stop - start) / 1000);
     
     const record: Omit<WorkTimeRecord, 'id' | 'createdAt' | 'updatedAt'> = {
-      date: currentDate,
+      date: currentDateStr,
       workType: 'kasu',
-      staffNames: kasuSelectedStaff.map(id => 
-        activeStaffList.find(s => s.id === id)?.name
-      ).filter(Boolean).join('、') || '未設定',
+      staffNames: kasuSelectedStaff.join('、') || '未設定',
       startTime: kasuStartTime,
       stopTime: now,
       totalSeconds: totalSeconds
@@ -295,224 +375,255 @@ const getTodayTasks = () => {
     
     try {
       await dataContext.saveWorkTimeRecord(record);
+      
+      // Supabaseから最新の1件を取得してallRecordsに追加
+      const { supabase } = await import('../lib/supabase');
+      const { data } = await supabase
+        .from('work_time_records')
+        .select('*')
+        .eq('date', currentDateStr)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const newRecord: WorkTimeRecord = {
+          id: data[0].id,
+          date: data[0].date,
+          workType: data[0].work_type || 'kasu',
+          staffNames: data[0].staff_names || '',
+          startTime: data[0].start_time || '',
+          stopTime: data[0].stop_time || '',
+          totalSeconds: data[0].total_seconds || 0,
+          dekoji: data[0].dekoji,
+          shikomi: data[0].shikomi,
+          tasks: data[0].tasks,
+          createdAt: data[0].created_at,
+          updatedAt: data[0].updated_at,
+        };
+        setAllRecords(prev => [newRecord, ...prev]);
+      }
+      
       setKasuStartTime(null);
-      setKasuStopTime(null);
     } catch (error) {
       console.error('粕取り作業記録保存エラー:', error);
       alert('記録の保存に失敗しました');
     }
   };
 
-  // 削除ハンドラー
-  const handleDelete = async (id: number | undefined) => {
-    if (!id) return;
-    if (!confirm('削除しますか？')) return;
-    
-    try {
-      await dataContext.deleteWorkTimeRecord(id, currentDate);
-    } catch (error) {
-      console.error('記録削除エラー:', error);
-      alert('記録の削除に失敗しました');
-    }
-  };
-
-  // スタッフ選択トグル
-  const toggleKoshikiStaff = (staffId: string) => {
-    setKoshikiSelectedStaff(prev => 
-      prev.includes(staffId) 
-        ? prev.filter(id => id !== staffId)
-        : [...prev, staffId]
-    );
-  };
-
-  const toggleKasuStaff = (staffId: string) => {
-    setKasuSelectedStaff(prev => 
-      prev.includes(staffId) 
-        ? prev.filter(id => id !== staffId)
-        : [...prev, staffId]
-    );
+  const handleDeleteRecord = async (recordId: number) => {
+    if (!confirm('この記録を削除しますか?')) return;
+    await dataContext.deleteWorkTimeRecord(recordId, currentDateStr);
+    // allRecordsからも削除
+    setAllRecords(prev => prev.filter(r => r.id !== recordId));
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold">⏱️ 作業タイム測定</h2>
-          <button onClick={onBack} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">← 戻る</button>
+    <div className="container mx-auto p-6">
+      {/* ヘッダー */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">⏱️ 作業タイム測定</h1>
+        <button
+          onClick={onBack}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        >
+          ← 戻る
+        </button>
+      </div>
+
+      {/* 日付ナビゲーション */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => changeDate(-1)}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          >
+            ← 前日
+          </button>
+          <div className="text-xl font-bold">{formatDisplayDate(currentDate)}</div>
+          <button
+            onClick={() => setCurrentDate(new Date())}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            今日
+          </button>
+          <button
+            onClick={() => changeDate(1)}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          >
+            翌日 →
+          </button>
         </div>
       </div>
 
       {/* 午前作業 */}
-      <div className="bg-white rounded-lg shadow mb-4">
-        <div 
-          className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
-          onClick={() => setMorningExpanded(!morningExpanded)}
-        >
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <span>{morningExpanded ? '▼' : '▶'}</span>
-            <span>午前作業</span>
-          </h3>
+      <div className="mb-6 bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">午前作業</h2>
+          <button
+            onClick={() => setMorningExpanded(!morningExpanded)}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            {morningExpanded ? '▼ 閉じる' : '▶ 開く'}
+          </button>
         </div>
-        
+
         {morningExpanded && (
-          <div className="p-4 border-t">
-            <div className="mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="text-sm font-bold mb-2">
-                    作業員: {earlyStaff.length > 0 ? earlyStaff.map(s => s.name).join('、') : '未設定'}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">開始:</span>
-                      <span className="ml-1 font-mono">{morningStartTime ? formatTimeOnly(morningStartTime) : '--:--:--'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">終了:</span>
-                      <span className="ml-1 font-mono">{morningStopTime ? formatTimeOnly(morningStopTime) : '--:--:--'}</span>
-                    </div>
-                    {morningStopTime && morningStartTime && (
-                      <div>
-                        <span className="text-gray-600">タイム:</span>
-                        <span className="ml-1 font-mono font-bold text-blue-600">
-                          {formatTime(Math.floor((new Date(morningStopTime).getTime() - new Date(morningStartTime).getTime()) / 1000))}
-                        </span>
+          <div>
+            {/* 早番スタッフ */}
+            <div className="mb-3 p-2 bg-gray-50 rounded">
+              <span className="font-bold text-sm mr-3">早番スタッフ</span>
+              {earlyStaff.length > 0 ? (
+                earlyStaff.map((staff, idx) => (
+                  <span key={staff.id}>
+                    {staff.name}
+                    {idx < earlyStaff.length - 1 ? '、' : ''}
+                  </span>
+                ))
+              ) : (
+                <span className="text-gray-500">未設定</span>
+              )}
+            </div>
+
+            {/* 本日の内容 */}
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <div className="font-bold text-sm mb-2">本日の内容</div>
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                {/* 出麹 */}
+                <div>
+                  <div className="font-semibold mb-1">🌾 出麹（前日）</div>
+                  {yesterdayDekoji.length > 0 ? (
+                    yesterdayDekoji.map((koji, i) => (
+                      <div key={i} className="mb-0.5">
+                        {koji.jungoId}号 {getProcessName(koji.processType || '')}
+                        {koji.storageType && ` ${koji.storageType}`}
                       </div>
-                    )}
-                  </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500">なし</div>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={handleMorningStart} disabled={morningStartTime !== null} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 text-sm font-bold">
-                    スタート
-                  </button>
-                  <button onClick={handleMorningStop} disabled={!morningStartTime || morningStopTime !== null} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300 text-sm font-bold">
-                    ストップ
-                  </button>
+
+                {/* 仕込み */}
+                <div>
+                  <div className="font-semibold mb-1">🍚 本日の仕込み</div>
+                  {todayShikomi.length > 0 ? (
+                    todayShikomi.map((m, i) => (
+                      <div key={i} className="mb-0.5">
+                        {m.jungoId}号 {m.status} {m.brewingSize}kg No.{m.tankNo}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500">なし</div>
+                  )}
+                </div>
+
+                {/* タスク */}
+                <div>
+                  <div className="font-semibold mb-1">✅ 本日のタスク</div>
+                  {todayTasksList.length > 0 ? (
+                    todayTasksList.map((task, i) => (
+                      <div key={i} className="mb-0.5">• {task}</div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500">なし</div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="bg-gray-50 rounded p-3">
-                <h4 className="font-bold mb-2 text-sm">🌾 出麹（前日）</h4>
-                {yesterdayDekoji.length > 0 ? (
-                  <div className="space-y-1 text-xs">
-                    {yesterdayDekoji.map((p, idx) => (
-                      <div key={idx} className="bg-white p-1 rounded">
-                        <div className="font-bold text-blue-600">
-                          {p.jungoId}号 {getProcessName(p.processType || '')}
-                          {p.storageType && <span className="ml-1 text-purple-600">{p.storageType === '冷蔵' ? '💧' : '🧊'}</span>}
-                        </div>
-                        <div className="text-gray-600">{p.amount}kg</div>
-                      </div>
-                    ))}
+            {/* タイマー */}
+            <div className="flex items-center gap-4 mb-4">
+              {!morningStartTime ? (
+                <button
+                  onClick={handleMorningStart}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold"
+                  disabled={earlyStaff.length === 0}
+                >
+                  START
+                </button>
+              ) : (
+                <>
+                  <div className="text-sm">
+                    <span className="text-gray-600">開始:</span>
+                    <span className="ml-2 font-mono text-lg">{formatTimeOnly(morningStartTime)}</span>
                   </div>
-                ) : (<p className="text-gray-400 text-center py-2 text-xs">なし</p>)}
-              </div>
-
-              <div className="bg-gray-50 rounded p-3">
-                <h4 className="font-bold mb-2 text-sm">💧 水麹準備</h4>
-                {todayShikomi.length > 0 ? (
-                  <div className="space-y-1 text-xs">
-                    {todayShikomi.map((m, idx) => (
-                      <div key={idx} className="bg-white p-1 rounded">
-                        <div className="flex justify-between">
-                          <span className="font-bold text-blue-600">{m.jungoId}号</span>
-                          <span className="px-1 bg-green-100 text-green-700 rounded text-xs">{m.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (<p className="text-gray-400 text-center py-2 text-xs">なし</p>)}
-              </div>
-
-              <div className="bg-gray-50 rounded p-3">
-                <h4 className="font-bold mb-2 text-sm">✅ 本日のタスク</h4>
-                {todayTasksList.length > 0 ? (
-                  <div className="space-y-1 text-xs">
-                    {todayTasksList.map((task, idx) => (
-                      <div key={idx} className="bg-white p-1 rounded text-xs">{task}</div>
-                    ))}
-                  </div>
-                ) : (<p className="text-gray-400 text-center py-2 text-xs">なし</p>)}
-              </div>
+                  <button
+                    onClick={handleMorningStop}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold"
+                  >
+                    STOP
+                  </button>
+                </>
+              )}
             </div>
 
-            {/* 午前作業の記録 */}
-            <div className="border-t pt-4">
-              <h4 className="font-bold mb-2 text-sm">📊 過去の記録</h4>
+            {/* 記録一覧 */}
+            <div className="mt-4">
+              <h3 className="font-bold mb-2">記録一覧</h3>
               {morningRecords.length > 0 ? (
-                <div className="space-y-2">
-                  {morningRecords.map((r, idx) => (
-                    <div key={r.id} className="border rounded">
+                <div className="space-y-1">
+                  {morningRecords.map((record, idx) => (
+                    <div key={record.id} className="border rounded bg-gray-50">
+                      {/* コンパクト表示行 */}
                       <div 
-                        className="flex items-center justify-between p-2 cursor-pointer hover:bg-gray-50"
+                        className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-100"
                         onClick={() => setMorningExpandedRecordIndex(morningExpandedRecordIndex === idx ? null : idx)}
                       >
-                        <div className="flex-1 flex items-center gap-3 text-xs">
-                          <span className="font-semibold">{formatDate(r.date)}</span>
-                          <span>{r.staffNames}</span>
-                          <span className="font-mono font-bold text-blue-600">{formatTime(r.totalSeconds)}</span>
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="font-semibold">{record.staffNames}</span>
+                          <span className="text-xs text-gray-500">{formatDisplayDate(new Date(record.date))}</span>
+                          <span className="text-gray-600">{formatTimeOnly(record.startTime)} - {formatTimeOnly(record.stopTime)}</span>
+                          <span className="font-mono text-gray-700">{formatTime(record.totalSeconds)}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{morningExpandedRecordIndex === idx ? '▼' : '▶'}</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(r.id);
-                            }}
-                            className="text-red-500 hover:text-red-700 text-xs px-2 py-1"
-                          >
-                            削除
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            record.id && handleDeleteRecord(record.id);
+                          }}
+                          className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs"
+                        >
+                          削除
+                        </button>
                       </div>
                       
-                      {morningExpandedRecordIndex === idx && (
-                        <div className="p-2 bg-gray-50 border-t">
-                          <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                      {/* 展開詳細 - 横並び3列 */}
+                      {morningExpandedRecordIndex === idx && record.dekoji && record.shikomi && record.tasks && (
+                        <div className="px-2 pb-2 pt-1 border-t">
+                          <div className="grid grid-cols-3 gap-4 text-xs">
+                            {/* 出麹 */}
                             <div>
-                              <div className="text-gray-600">スタート</div>
-                              <div className="font-mono">{formatTimeOnly(r.startTime)}</div>
-                            </div>
-                            <div>
-                              <div className="text-gray-600">ストップ</div>
-                              <div className="font-mono">{formatTimeOnly(r.stopTime)}</div>
-                            </div>
-                            <div>
-                              <div className="text-gray-600">タイム</div>
-                              <div className="font-mono font-bold text-blue-600">{formatTime(r.totalSeconds)}</div>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div>
-                              <div className="font-bold mb-1">🌾 出麹</div>
-                              {r.dekoji && r.dekoji.length > 0 ? (
-                                r.dekoji.map((p: any, i: number) => (
-                                  <div key={i} className="bg-white p-1 rounded mb-1">
-                                    {p.jungoId}号 {getProcessName(p.processType || '')}
-                                  </div>
+                              <div className="font-semibold mb-0.5">🌾 出麹（前日）</div>
+                              {record.dekoji.length > 0 ? (
+                                record.dekoji.map((koji: any, i: number) => (
+                                  <div key={i}>{koji.jungoId}号 {getProcessName(koji.processType || '')} {koji.storageType}</div>
                                 ))
-                              ) : <div className="text-gray-400">なし</div>}
+                              ) : (
+                                <div className="text-gray-500">なし</div>
+                              )}
                             </div>
+
+                            {/* 仕込み */}
                             <div>
-                              <div className="font-bold mb-1">💧 水麹</div>
-                              {r.shikomi && r.shikomi.length > 0 ? (
-                                r.shikomi.map((m: any, i: number) => (
-                                  <div key={i} className="bg-white p-1 rounded mb-1">
-                                    {m.jungoId}号 {m.status}
-                                  </div>
+                              <div className="font-semibold mb-0.5">🍚 本日の仕込み</div>
+                              {record.shikomi.length > 0 ? (
+                                record.shikomi.map((m: any, i: number) => (
+                                  <div key={i}>{m.jungoId}号 {m.status} {m.brewingSize}kg No.{m.tankNo}</div>
                                 ))
-                              ) : <div className="text-gray-400">なし</div>}
+                              ) : (
+                                <div className="text-gray-500">なし</div>
+                              )}
                             </div>
+
+                            {/* タスク */}
                             <div>
-                              <div className="font-bold mb-1">✅ タスク</div>
-                              {r.tasks && r.tasks.length > 0 ? (
-                                r.tasks.map((t: string, i: number) => (
-                                  <div key={i} className="bg-white p-1 rounded mb-1">{t}</div>
+                              <div className="font-semibold mb-0.5">✅ 本日のタスク</div>
+                              {record.tasks.length > 0 ? (
+                                record.tasks.map((task: string, i: number) => (
+                                  <div key={i}>• {task}</div>
                                 ))
-                              ) : <div className="text-gray-400">なし</div>}
+                              ) : (
+                                <div className="text-gray-500">なし</div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -520,227 +631,225 @@ const getTodayTasks = () => {
                     </div>
                   ))}
                 </div>
-              ) : (<p className="text-gray-400 text-center py-4 text-xs">記録がありません</p>)}
+              ) : (
+                <div className="text-gray-500">記録なし</div>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* 甑準備作業 */}
-      <div className="bg-white rounded-lg shadow mb-4">
-        <div 
-          className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
-          onClick={() => setKoshikiExpanded(!koshikiExpanded)}
-        >
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <span>{koshikiExpanded ? '▼' : '▶'}</span>
-            <span>甑準備作業</span>
-          </h3>
+      {/* 甑準備 */}
+      <div className="mb-6 bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">甑準備</h2>
+          <button
+            onClick={() => setKoshikiExpanded(!koshikiExpanded)}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            {koshikiExpanded ? '▼ 閉じる' : '▶ 開く'}
+          </button>
         </div>
-        
+
         {koshikiExpanded && (
-          <div className="p-4 border-t">
+          <div>
+            {/* スタッフ選択 */}
             <div className="mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="text-sm font-bold mb-2 flex items-center gap-2">
-                    <span>作業員:</span>
-                    <div className="relative">
-                      <button 
-                        onClick={() => setKoshikiDropdownOpen(!koshikiDropdownOpen)}
-                        className="px-3 py-1 bg-gray-100 border rounded hover:bg-gray-200 text-sm"
-                      >
-                        {koshikiSelectedStaff.length > 0 
-                          ? koshikiSelectedStaff.map(id => activeStaffList.find(s => s.id === id)?.name).join('、')
-                          : '未設定'} ▼
-                      </button>
-                      {koshikiDropdownOpen && (
-                        <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-lg z-10 min-w-[200px]">
-                          {activeStaffList.map(staff => (
-                            <label key={staff.id} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                checked={koshikiSelectedStaff.includes(staff.id)}
-                                onChange={() => toggleKoshikiStaff(staff.id)}
-                                className="mr-2"
-                              />
-                              <span className="text-sm">{staff.name}</span>
-                            </label>
-                          ))}
-                          <button 
-                            onClick={() => setKoshikiDropdownOpen(false)}
-                            className="w-full px-3 py-2 bg-blue-500 text-white text-sm hover:bg-blue-600"
-                          >
-                            確定
-                          </button>
-                        </div>
-                      )}
-                    </div>
+              <div className="relative">
+                <button
+                  onClick={() => setKoshikiDropdownOpen(!koshikiDropdownOpen)}
+                  className="w-full px-4 py-2 border rounded bg-white text-left flex justify-between items-center"
+                >
+                  <span>
+                    {koshikiSelectedStaff.length > 0 
+                      ? koshikiSelectedStaff.join('、') 
+                      : 'スタッフを選択'}
+                  </span>
+                  <span>▼</span>
+                </button>
+                
+                {koshikiDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto">
+                    {activeStaffList.map(staff => (
+                      <label key={staff.id} className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={koshikiSelectedStaff.includes(staff.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setKoshikiSelectedStaff([...koshikiSelectedStaff, staff.name]);
+                            } else {
+                              setKoshikiSelectedStaff(koshikiSelectedStaff.filter(n => n !== staff.name));
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        {staff.name}
+                      </label>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">開始:</span>
-                      <span className="ml-1 font-mono">{koshikiStartTime ? formatTimeOnly(koshikiStartTime) : '--:--:--'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">終了:</span>
-                      <span className="ml-1 font-mono">{koshikiStopTime ? formatTimeOnly(koshikiStopTime) : '--:--:--'}</span>
-                    </div>
-                    {koshikiStopTime && koshikiStartTime && (
-                      <div>
-                        <span className="text-gray-600">タイム:</span>
-                        <span className="ml-1 font-mono font-bold text-blue-600">
-                          {formatTime(Math.floor((new Date(koshikiStopTime).getTime() - new Date(koshikiStartTime).getTime()) / 1000))}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={handleKoshikiStart} disabled={koshikiStartTime !== null} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 text-sm font-bold">
-                    スタート
-                  </button>
-                  <button onClick={handleKoshikiStop} disabled={!koshikiStartTime || koshikiStopTime !== null} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300 text-sm font-bold">
-                    ストップ
-                  </button>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* 甑準備作業の記録 */}
-            <div className="border-t pt-4">
-              <h4 className="font-bold mb-2 text-sm">📊 過去の記録</h4>
+            {/* タイマー */}
+            <div className="flex items-center gap-4 mb-4">
+              {!koshikiStartTime ? (
+                <button
+                  onClick={handleKoshikiStart}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold"
+                >
+                  START
+                </button>
+              ) : (
+                <>
+                  <div className="text-sm">
+                    <span className="text-gray-600">開始:</span>
+                    <span className="ml-2 font-mono text-lg">{formatTimeOnly(koshikiStartTime)}</span>
+                  </div>
+                  <button
+                    onClick={handleKoshikiStop}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold"
+                  >
+                    STOP
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* 記録一覧 */}
+            <div className="mt-4">
+              <h3 className="font-bold mb-2">記録一覧</h3>
               {koshikiRecords.length > 0 ? (
-                <div className="space-y-2">
-                  {koshikiRecords.map((r) => (
-                    <div key={r.id} className="border rounded p-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{formatDate(r.date)}</span>
-                          <span>{r.staffNames}</span>
-                          <span className="font-mono font-bold text-blue-600">{formatTime(r.totalSeconds)}</span>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(r.id)}
-                          className="text-red-500 hover:text-red-700 text-xs px-2 py-1"
-                        >
-                          削除
-                        </button>
+                <div className="space-y-1">
+                  {koshikiRecords.map(record => (
+                    <div key={record.id} className="border rounded bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="font-semibold">{record.staffNames}</span>
+                        <span className="text-xs text-gray-500">{formatDisplayDate(new Date(record.date))}</span>
+                        <span className="text-gray-600">{formatTimeOnly(record.startTime)} - {formatTimeOnly(record.stopTime)}</span>
+                        <span className="font-mono text-gray-700">{formatTime(record.totalSeconds)}</span>
                       </div>
+                      <button
+                        onClick={() => record.id && handleDeleteRecord(record.id)}
+                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs"
+                      >
+                        削除
+                      </button>
                     </div>
                   ))}
                 </div>
-              ) : (<p className="text-gray-400 text-center py-4 text-xs">記録がありません</p>)}
+              ) : (
+                <div className="text-gray-500">記録なし</div>
+              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* 粕取り作業 */}
-      <div className="bg-white rounded-lg shadow mb-4">
-        <div 
-          className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
-          onClick={() => setKasuExpanded(!kasuExpanded)}
-        >
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <span>{kasuExpanded ? '▼' : '▶'}</span>
-            <span>粕取り作業</span>
-          </h3>
+      {/* 粕取り */}
+      <div className="mb-6 bg-white rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">粕取り</h2>
+          <button
+            onClick={() => setKasuExpanded(!kasuExpanded)}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            {kasuExpanded ? '▼ 閉じる' : '▶ 開く'}
+          </button>
         </div>
-        
+
         {kasuExpanded && (
-          <div className="p-4 border-t">
+          <div>
+            {/* スタッフ選択 */}
             <div className="mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="text-sm font-bold mb-2 flex items-center gap-2">
-                    <span>作業員:</span>
-                    <div className="relative">
-                      <button 
-                        onClick={() => setKasuDropdownOpen(!kasuDropdownOpen)}
-                        className="px-3 py-1 bg-gray-100 border rounded hover:bg-gray-200 text-sm"
-                      >
-                        {kasuSelectedStaff.length > 0 
-                          ? kasuSelectedStaff.map(id => activeStaffList.find(s => s.id === id)?.name).join('、')
-                          : '未設定'} ▼
-                      </button>
-                      {kasuDropdownOpen && (
-                        <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-lg z-10 min-w-[200px]">
-                          {activeStaffList.map(staff => (
-                            <label key={staff.id} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                checked={kasuSelectedStaff.includes(staff.id)}
-                                onChange={() => toggleKasuStaff(staff.id)}
-                                className="mr-2"
-                              />
-                              <span className="text-sm">{staff.name}</span>
-                            </label>
-                          ))}
-                          <button 
-                            onClick={() => setKasuDropdownOpen(false)}
-                            className="w-full px-3 py-2 bg-blue-500 text-white text-sm hover:bg-blue-600"
-                          >
-                            確定
-                          </button>
-                        </div>
-                      )}
-                    </div>
+              <div className="relative">
+                <button
+                  onClick={() => setKasuDropdownOpen(!kasuDropdownOpen)}
+                  className="w-full px-4 py-2 border rounded bg-white text-left flex justify-between items-center"
+                >
+                  <span>
+                    {kasuSelectedStaff.length > 0 
+                      ? kasuSelectedStaff.join('、') 
+                      : 'スタッフを選択'}
+                  </span>
+                  <span>▼</span>
+                </button>
+                
+                {kasuDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto">
+                    {activeStaffList.map(staff => (
+                      <label key={staff.id} className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={kasuSelectedStaff.includes(staff.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setKasuSelectedStaff([...kasuSelectedStaff, staff.name]);
+                            } else {
+                              setKasuSelectedStaff(kasuSelectedStaff.filter(n => n !== staff.name));
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        {staff.name}
+                      </label>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">開始:</span>
-                      <span className="ml-1 font-mono">{kasuStartTime ? formatTimeOnly(kasuStartTime) : '--:--:--'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">終了:</span>
-                      <span className="ml-1 font-mono">{kasuStopTime ? formatTimeOnly(kasuStopTime) : '--:--:--'}</span>
-                    </div>
-                    {kasuStopTime && kasuStartTime && (
-                      <div>
-                        <span className="text-gray-600">タイム:</span>
-                        <span className="ml-1 font-mono font-bold text-blue-600">
-                          {formatTime(Math.floor((new Date(kasuStopTime).getTime() - new Date(kasuStartTime).getTime()) / 1000))}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={handleKasuStart} disabled={kasuStartTime !== null} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 text-sm font-bold">
-                    スタート
-                  </button>
-                  <button onClick={handleKasuStop} disabled={!kasuStartTime || kasuStopTime !== null} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300 text-sm font-bold">
-                    ストップ
-                  </button>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* 粕取り作業の記録 */}
-            <div className="border-t pt-4">
-              <h4 className="font-bold mb-2 text-sm">📊 過去の記録</h4>
+            {/* タイマー */}
+            <div className="flex items-center gap-4 mb-4">
+              {!kasuStartTime ? (
+                <button
+                  onClick={handleKasuStart}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold"
+                >
+                  START
+                </button>
+              ) : (
+                <>
+                  <div className="text-sm">
+                    <span className="text-gray-600">開始:</span>
+                    <span className="ml-2 font-mono text-lg">{formatTimeOnly(kasuStartTime)}</span>
+                  </div>
+                  <button
+                    onClick={handleKasuStop}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold"
+                  >
+                    STOP
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* 記録一覧 */}
+            <div className="mt-4">
+              <h3 className="font-bold mb-2">記録一覧</h3>
               {kasuRecords.length > 0 ? (
-                <div className="space-y-2">
-                  {kasuRecords.map((r) => (
-                    <div key={r.id} className="border rounded p-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{formatDate(r.date)}</span>
-                          <span>{r.staffNames}</span>
-                          <span className="font-mono font-bold text-blue-600">{formatTime(r.totalSeconds)}</span>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(r.id)}
-                          className="text-red-500 hover:text-red-700 text-xs px-2 py-1"
-                        >
-                          削除
-                        </button>
+                <div className="space-y-1">
+                  {kasuRecords.map(record => (
+                    <div key={record.id} className="border rounded bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="font-semibold">{record.staffNames}</span>
+                        <span className="text-xs text-gray-500">{formatDisplayDate(new Date(record.date))}</span>
+                        <span className="text-gray-600">{formatTimeOnly(record.startTime)} - {formatTimeOnly(record.stopTime)}</span>
+                        <span className="font-mono text-gray-700">{formatTime(record.totalSeconds)}</span>
                       </div>
+                      <button
+                        onClick={() => record.id && handleDeleteRecord(record.id)}
+                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs"
+                      >
+                        削除
+                      </button>
                     </div>
                   ))}
                 </div>
-              ) : (<p className="text-gray-400 text-center py-4 text-xs">記録がありません</p>)}
+              ) : (
+                <div className="text-gray-500">記録なし</div>
+              )}
             </div>
           </div>
         )}
