@@ -175,15 +175,17 @@ export interface WeeklyDutyAction {
 }
 
 // 上槽評価データ
+// 上槽評価データ
+// 上槽評価データ
 export interface JosoHyoka {
   by: number;
   jungoId: string;
   rating: 'S' | 'A' | 'B' | 'C' | 'D' | null;
+  ratingComment: string;
   staffComments: { [staffId: string]: string };
   createdAt: string;
   updatedAt: string;
 }
-
 // 作業タイプ
 // 作業タイプ
 export type WorkType = 'morning' | 'koshiki' | 'kasu';

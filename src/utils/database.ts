@@ -460,13 +460,14 @@ export const getJosoHyokaByBY = async (by: number): Promise<JosoHyoka[]> => {
   if (error) throw error;
 
   return (data || []).map(row => ({
-    by: row.by,
-    jungoId: row.jungo_id,
-    rating: row.rating,
-    staffComments: row.staff_comments || {},
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  by: row.by,
+  jungoId: row.jungo_id,
+  rating: row.rating,
+  ratingComment: row.rating_comment || '',
+  staffComments: row.staff_comments || {},
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+}));
 };
 
 export const saveJosoHyoka = async (hyoka: Omit<JosoHyoka, 'createdAt' | 'updatedAt'>): Promise<void> => {
@@ -476,6 +477,7 @@ export const saveJosoHyoka = async (hyoka: Omit<JosoHyoka, 'createdAt' | 'update
       by: hyoka.by,
       jungo_id: hyoka.jungoId,
       rating: hyoka.rating,
+      rating_comment: hyoka.ratingComment || '',
       staff_comments: hyoka.staffComments,
       updated_at: new Date().toISOString(),
     });
