@@ -51,9 +51,12 @@ export default function WorkTimer({
   const [kasuDropdownOpen, setKasuDropdownOpen] = useState(false);
 
   // ✅ 文字列形式の日付を取得（データ取得や保存に使用）
-  const currentDateStr = useMemo(() => {
-    return currentDate.toISOString().split('T')[0];
-  }, [currentDate]);
+ const currentDateStr = useMemo(() => {
+  const year = currentDate.getFullYear();
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const day = String(currentDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}, [currentDate]);
 
   // ✅ 初回マウント時にSupabaseから全記録を直接取得
   useEffect(() => {
@@ -117,9 +120,12 @@ export default function WorkTimer({
 
   // ✅ 前日の出麹を取得（useMemoで依存関係管理）
   const yesterdayDekoji = useMemo(() => {
-    const yesterday = new Date(currentDate);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+const yesterday = new Date(currentDate);
+yesterday.setDate(yesterday.getDate() - 1);
+const year = yesterday.getFullYear();
+const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+const day = String(yesterday.getDate()).padStart(2, '0');
+const yesterdayStr = `${year}-${month}-${day}`;
 
     const kojiProcesses = moromiProcesses.filter(p => 
       p.by === currentBY &&
@@ -157,8 +163,11 @@ export default function WorkTimer({
   // ✅ 本日のタスクを取得（useMemoで依存関係管理）
   const todayTasksList = useMemo(() => {
     const tomorrow = new Date(currentDate);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+tomorrow.setDate(tomorrow.getDate() + 1);
+const year = tomorrow.getFullYear();
+const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+const day = String(tomorrow.getDate()).padStart(2, '0');
+const tomorrowStr = `${year}-${month}-${day}`;
     const taskList: string[] = [];
 
     moromiData.forEach(m => {
