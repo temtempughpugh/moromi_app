@@ -24,6 +24,7 @@ export default function JosoCommentAlert({
       jungoId,
       rating: null,
       staffComments: {},
+      ratingComment: '',  
       createdAt: '',
       updatedAt: '',
     };
