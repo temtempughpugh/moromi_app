@@ -202,6 +202,7 @@ export interface WorkTimeRecord {
   dekoji?: any;
   shikomi?: any;
   tasks?: any;
+  joso?: any;  // ← 追加
   createdAt?: string;
   updatedAt?: string;
 }

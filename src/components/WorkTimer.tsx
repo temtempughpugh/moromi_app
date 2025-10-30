@@ -43,6 +43,7 @@ export default function WorkTimer({
   
   // 各作業タイプごとの記録展開インデックス
   const [morningExpandedRecordIndex, setMorningExpandedRecordIndex] = useState<number | null>(null);
+  const [kasuExpandedRecordIndex, setKasuExpandedRecordIndex] = useState<number | null>(null);
   
   // 甑準備・粕取りの選択スタッフ
   const [koshikiSelectedStaff, setKoshikiSelectedStaff] = useState<string[]>([]);
@@ -50,13 +51,13 @@ export default function WorkTimer({
   const [koshikiDropdownOpen, setKoshikiDropdownOpen] = useState(false);
   const [kasuDropdownOpen, setKasuDropdownOpen] = useState(false);
 
-  // ✅ 文字列形式の日付を取得（データ取得や保存に使用）
- const currentDateStr = useMemo(() => {
-  const year = currentDate.getFullYear();
-  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-  const day = String(currentDate.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}, [currentDate]);
+  // ✅ 文字列形式の日付を取得（タイムゾーン修正済み）
+  const currentDateStr = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, [currentDate]);
 
   // ✅ 初回マウント時にSupabaseから全記録を直接取得
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function WorkTimer({
         const { supabase } = await import('../lib/supabase');
         const { data, error } = await supabase
           .from('work_time_records')
-          .select('id, date, work_type, staff_names, start_time, stop_time, total_seconds, dekoji, shikomi, tasks, created_at, updated_at')
+          .select('id, date, work_type, staff_names, start_time, stop_time, total_seconds, dekoji, shikomi, tasks, joso, created_at, updated_at')
           .order('date', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -87,6 +88,7 @@ export default function WorkTimer({
             dekoji: row.dekoji,
             shikomi: row.shikomi,
             tasks: row.tasks,
+            joso: row.joso,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
           }));
@@ -118,14 +120,14 @@ export default function WorkTimer({
 
   const activeStaffList = staffList.filter(s => s.isActive);
 
-  // ✅ 前日の出麹を取得（useMemoで依存関係管理）
+  // ✅ 前日の出麹を取得（タイムゾーン修正済み）
   const yesterdayDekoji = useMemo(() => {
-const yesterday = new Date(currentDate);
-yesterday.setDate(yesterday.getDate() - 1);
-const year = yesterday.getFullYear();
-const month = String(yesterday.getMonth() + 1).padStart(2, '0');
-const day = String(yesterday.getDate()).padStart(2, '0');
-const yesterdayStr = `${year}-${month}-${day}`;
+    const yesterday = new Date(currentDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const year = yesterday.getFullYear();
+    const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const day = String(yesterday.getDate()).padStart(2, '0');
+    const yesterdayStr = `${year}-${month}-${day}`;
 
     const kojiProcesses = moromiProcesses.filter(p => 
       p.by === currentBY &&
@@ -160,14 +162,14 @@ const yesterdayStr = `${year}-${month}-${day}`;
     }));
   }, [moromiData, currentDateStr, currentBY]);
 
-  // ✅ 本日のタスクを取得（useMemoで依存関係管理）
+  // ✅ 本日のタスクを取得（タイムゾーン修正済み）
   const todayTasksList = useMemo(() => {
     const tomorrow = new Date(currentDate);
-tomorrow.setDate(tomorrow.getDate() + 1);
-const year = tomorrow.getFullYear();
-const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-const day = String(tomorrow.getDate()).padStart(2, '0');
-const tomorrowStr = `${year}-${month}-${day}`;
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const tomorrowStr = `${year}-${month}-${day}`;
     const taskList: string[] = [];
 
     moromiData.forEach(m => {
@@ -200,6 +202,14 @@ const tomorrowStr = `${year}-${month}-${day}`;
 
     return taskList;
   }, [moromiData, currentDate, currentBY, currentDateStr]);
+
+  // ✅ 本日の上槽を取得（NEW）
+  const todayJoso = useMemo(() => {
+    return moromiData.filter(m => {
+      if (m.by !== currentBY) return false;
+      return m.josoDate === currentDateStr;
+    });
+  }, [moromiData, currentDateStr, currentBY]);
 
   const getProcessName = (processType: string): string => {
     const map: { [key: string]: string } = {
@@ -284,6 +294,7 @@ const tomorrowStr = `${year}-${month}-${day}`;
           dekoji: data[0].dekoji,
           shikomi: data[0].shikomi,
           tasks: data[0].tasks,
+          joso: data[0].joso,
           createdAt: data[0].created_at,
           updatedAt: data[0].updated_at,
         };
@@ -345,6 +356,7 @@ const tomorrowStr = `${year}-${month}-${day}`;
           dekoji: data[0].dekoji,
           shikomi: data[0].shikomi,
           tasks: data[0].tasks,
+          joso: data[0].joso,
           createdAt: data[0].created_at,
           updatedAt: data[0].updated_at,
         };
@@ -379,7 +391,8 @@ const tomorrowStr = `${year}-${month}-${day}`;
       staffNames: kasuSelectedStaff.join('、') || '未設定',
       startTime: kasuStartTime,
       stopTime: now,
-      totalSeconds: totalSeconds
+      totalSeconds: totalSeconds,
+      joso: todayJoso  // ← 追加
     };
     
     try {
@@ -406,6 +419,7 @@ const tomorrowStr = `${year}-${month}-${day}`;
           dekoji: data[0].dekoji,
           shikomi: data[0].shikomi,
           tasks: data[0].tasks,
+          joso: data[0].joso,
           createdAt: data[0].created_at,
           updatedAt: data[0].updated_at,
         };
@@ -770,6 +784,21 @@ const tomorrowStr = `${year}-${month}-${day}`;
 
         {kasuExpanded && (
           <div>
+            {/* 本日の上槽（NEW） */}
+            <div className="mb-3 p-2 bg-gray-50 rounded">
+              <span className="font-bold text-sm mr-3">本日の上槽</span>
+              {todayJoso.length > 0 ? (
+                todayJoso.map((m, idx) => (
+                  <span key={m.jungoId}>
+                    {m.jungoId}号 {m.brewingCategory} {m.brewingSize}kg No.{m.tankNo}
+                    {idx < todayJoso.length - 1 ? '、' : ''}
+                  </span>
+                ))
+              ) : (
+                <span className="text-gray-500">なし</span>
+              )}
+            </div>
+
             {/* スタッフ選択 */}
             <div className="mb-4">
               <div className="relative">
@@ -839,20 +868,47 @@ const tomorrowStr = `${year}-${month}-${day}`;
               <h3 className="font-bold mb-2">記録一覧</h3>
               {kasuRecords.length > 0 ? (
                 <div className="space-y-1">
-                  {kasuRecords.map(record => (
-                    <div key={record.id} className="border rounded bg-gray-50 p-2 flex justify-between items-center hover:bg-gray-100">
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="font-semibold">{record.staffNames}</span>
-                        <span className="text-xs text-gray-500">{formatDisplayDate(new Date(record.date))}</span>
-                        <span className="text-gray-600">{formatTimeOnly(record.startTime)} - {formatTimeOnly(record.stopTime)}</span>
-                        <span className="font-mono text-gray-700">{formatTime(record.totalSeconds)}</span>
-                      </div>
-                      <button
-                        onClick={() => record.id && handleDeleteRecord(record.id)}
-                        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs"
+                  {kasuRecords.map((record, idx) => (
+                    <div key={record.id} className="border rounded bg-gray-50">
+                      {/* コンパクト表示行 */}
+                      <div 
+                        className="flex justify-between items-center p-2 cursor-pointer hover:bg-gray-100"
+                        onClick={() => setKasuExpandedRecordIndex(kasuExpandedRecordIndex === idx ? null : idx)}
                       >
-                        削除
-                      </button>
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="font-semibold">{record.staffNames}</span>
+                          <span className="text-xs text-gray-500">{formatDisplayDate(new Date(record.date))}</span>
+                          <span className="text-gray-600">{formatTimeOnly(record.startTime)} - {formatTimeOnly(record.stopTime)}</span>
+                          <span className="font-mono text-gray-700">{formatTime(record.totalSeconds)}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            record.id && handleDeleteRecord(record.id);
+                          }}
+                          className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs"
+                        >
+                          削除
+                        </button>
+                      </div>
+                      
+                      {/* 展開詳細 - 上槽情報 */}
+                      {kasuExpandedRecordIndex === idx && record.joso && (
+                        <div className="px-2 pb-2 pt-1 border-t">
+                          <div className="text-xs">
+                            <div className="font-semibold mb-0.5">🍶 本日の上槽</div>
+                            {record.joso.length > 0 ? (
+                              record.joso.map((m: any, i: number) => (
+                                <div key={i}>
+                                  {m.jungoId}号 {m.brewingCategory} {m.brewingSize}kg No.{m.tankNo}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-gray-500">なし</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

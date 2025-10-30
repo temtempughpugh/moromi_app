@@ -821,6 +821,7 @@ export const saveWorkTimeRecord = async (record: Omit<WorkTimeRecord, 'id' | 'cr
   dekoji: record.dekoji || null,
   shikomi: record.shikomi || null,
   tasks: record.tasks || null,
+  joso: record.joso || null,
   updated_at: new Date().toISOString(),
 });
 
