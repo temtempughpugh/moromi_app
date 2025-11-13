@@ -67,7 +67,7 @@ export interface Shift {
   date: string;
   staffId: string;
   shiftType: 'normal' | 'early';
-  workHours: 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null;
+  workHours: 4 | 6 | 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null;
   memo: string | null;
   createdAt: string;
   updatedAt: string;

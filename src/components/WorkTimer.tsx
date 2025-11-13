@@ -59,6 +59,13 @@ export default function WorkTimer({
     return `${year}-${month}-${day}`;
   }, [currentDate]);
 
+  // ✅ 今日の月のシフトをロード（追加）
+useEffect(() => {
+  const yearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+  dataContext.loadShiftsByMonth(yearMonth);
+}, [currentDate]); // currentDateが変わるたびに実行
+
+
   // ✅ 初回マウント時にSupabaseから全記録を直接取得
   useEffect(() => {
     const loadAllRecords = async () => {

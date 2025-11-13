@@ -391,6 +391,7 @@ return {
   riceDelivery,
   currentShiftMonth,
   setCurrentShiftMonth,
+  loadShiftsByMonth,  // ← この行を追加
   saveStaff,
   deleteStaff,
   saveShifts,

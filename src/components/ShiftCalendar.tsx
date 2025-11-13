@@ -219,7 +219,7 @@ export default function ShiftCalendar({
       date,
       staffId,
       shiftType: shiftType as 'normal' | 'early',
-      workHours: workHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
+      workHours: workHours as 4 | 6 | 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
       memo: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -251,7 +251,7 @@ export default function ShiftCalendar({
           date: dates[i],
           staffId,
           shiftType: prevShiftType as 'normal' | 'early',
-          workHours: prevWorkHours as 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
+          workHours: prevWorkHours as 4 | 6 | 8.5 | 7 | 8 | 9 | 7.5 | 5.5 | null,
           memo: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -761,23 +761,25 @@ export default function ShiftCalendar({
                         >
                           <option value=""></option>
                           <optgroup label="通常">
-                            <option value="normal-8.5">8.5</option>
-                            <option value="normal-7">7</option>
-                            <option value="normal-8">8</option>
-                            <option value="normal-9">9</option>
-                            <option value="normal-7.5">7.5</option>
-                            <option value="normal-5.5">5.5</option>
-                            <option value="normal-rest">休</option>
-                          </optgroup>
-                          <optgroup label="早出">
-                            <option value="early-8.5">{isEarly ? '8.5' : '早8.5'}</option>
-                            <option value="early-7">{isEarly ? '7' : '早7'}</option>
-                            <option value="early-8">{isEarly ? '8' : '早8'}</option>
-                            <option value="early-9">{isEarly ? '9' : '早9'}</option>
-                            <option value="early-7.5">{isEarly ? '7.5' : '早7.5'}</option>
-                            <option value="early-5.5">{isEarly ? '5.5' : '早5.5'}</option>
-                            <option value="early-rest">休</option>
-                          </optgroup>
+  <option value="normal-7.5">7.5</option>
+    <option value="normal-8.5">8.5</option>
+  <option value="normal-7">7</option>
+  <option value="normal-8">8</option>
+  <option value="normal-9">9</option>
+  <option value="normal-5.5">5.5</option>
+    <option value="normal-4">4</option>
+  <option value="normal-rest">休</option>
+</optgroup>
+<optgroup label="早出">
+  <option value="early-8.5">{isEarly ? '8.5' : '早8.5'}</option>
+  <option value="early-7">{isEarly ? '7' : '早7'}</option>
+  <option value="early-8">{isEarly ? '8' : '早8'}</option>
+  <option value="early-9">{isEarly ? '9' : '早9'}</option>
+  <option value="early-7.5">{isEarly ? '7.5' : '早7.5'}</option>
+  <option value="early-6">{isEarly ? '6' : '早6'}</option>
+  <option value="early-5.5">{isEarly ? '5.5' : '早5.5'}</option>
+  <option value="early-rest">休</option>
+</optgroup>
                         </select>
                       </td>
                     );
