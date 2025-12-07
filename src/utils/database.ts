@@ -4,7 +4,7 @@ import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow,
 
 // データ保存
 export async function saveMoromiData(moromiDataList: MoromiData[], processList: MoromiProcess[]): Promise<void> {
-  // moromi_data を保存（既存と同じ）
+  // moromi_data を保存
   const { error: moromiError } = await supabase
     .from('moromi_data')
     .upsert(moromiDataList.map(m => ({
@@ -17,7 +17,7 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
       joso_date: m.josoDate,
       tank_no: m.tankNo,
       soe_tank_id: m.soeTankId || null, 
-      kentei_tank_id: m.kenteiTankId, // ← この行を追加
+      kentei_tank_id: m.kenteiTankId,
       memo: m.memo,
       moto_oroshi_date: m.motoOroshiDate,
       soe_shikomi_date: m.soeShikomiDate,
@@ -30,10 +30,24 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
 
   if (moromiError) throw moromiError;
 
-  // moromi_process を保存（新規フィールド追加）
+  // 更新対象の順号を抽出
+  const updateTargets = [...new Set(moromiDataList.map(m => ({ by: m.by, jungoId: m.jungoId })))];
+  
+  // 更新対象の順号のmoromi_processを全削除
+  for (const { by, jungoId } of updateTargets) {
+    const { error: deleteError } = await supabase
+      .from('moromi_process')
+      .delete()
+      .eq('by', by)
+      .eq('jungo_id', jungoId);
+    
+    if (deleteError) throw deleteError;
+  }
+  
+  // 新しいデータをINSERT
   const { error: processError } = await supabase
     .from('moromi_process')
-    .upsert(processList.map(p => ({
+    .insert(processList.map(p => ({
       by: p.by,
       jungo_id: p.jungoId,
       process_type: p.processType,
@@ -46,13 +60,12 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
       dekoji_date: p.dekojiDate,
       kake_shikomi_date: p.kakeShikomiDate,
       shikomi_date: p.shikomiDate,
-      // 新規フィールド
       predicted_dekoji_rate: p.predictedDekojiRate,
       last_sheet_weight: p.lastSheetWeight,
       actual_dekoji_rate: p.actualDekojiRate,
       storage_type: p.storageType,
       updated_at: new Date().toISOString()
-    })), { onConflict: 'by,jungo_id,process_type,rice_type' });
+    })));
 
   if (processError) throw processError;
 }
