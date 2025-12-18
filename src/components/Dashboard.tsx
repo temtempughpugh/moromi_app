@@ -2,15 +2,15 @@ import { useState } from 'react';
 import type { MoromiData, MoromiProcess, OverdueTask } from '../utils/types';
 import { Fragment } from 'react';
 import { KojiService } from '../services/KojiService';
+import { supabase } from '../lib/supabase';
 
 interface DashboardProps {
   moromiData: MoromiData[];
   moromiProcesses: MoromiProcess[];
   getProcessesByMoromi: (by: number, jungoId: string) => Promise<MoromiProcess[]>;
-  saveMoromiData: (moromiDataList: MoromiData[], processList: MoromiProcess[]) => Promise<void>;
   loadMoromiByBY: (by: number) => Promise<void>;
   currentBY: number;
-  dataContext: any;  // ← 追加
+  dataContext: any;
 }
 
 interface TodayTask {
@@ -26,7 +26,7 @@ interface TodayTask {
   process?: MoromiProcess;
 }
 
-export default function Dashboard({ moromiData, moromiProcesses, saveMoromiData, loadMoromiByBY, currentBY, dataContext }: DashboardProps) {
+export default function Dashboard({ moromiData, moromiProcesses, loadMoromiByBY, currentBY, dataContext }: DashboardProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [expandedJungo, setExpandedJungo] = useState<string | null>(null);
@@ -340,26 +340,33 @@ const calculateTotal = (tasks: TodayTask[]): number => {
   }
 };
 
-// ← ここに追加
 async function handleSoeTankChange(by: number, jungoId: string, soeTankId: string) {
-  const updatedMoromi = moromiData.map(m => 
-    m.by === by && m.jungoId === jungoId 
-      ? { ...m, soeTankId: soeTankId || null }
-      : m
-  );
+  const { error } = await supabase
+    .from('moromi_data')
+    .update({ soe_tank_id: soeTankId || null, updated_at: new Date().toISOString() })
+    .eq('by', by)
+    .eq('jungo_id', jungoId);
   
-  await saveMoromiData(updatedMoromi, moromiProcesses);
+  if (error) {
+    console.error('添タンク更新エラー:', error);
+    return;
+  }
+  
   await loadMoromiByBY(currentBY);
 }
 
 async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId: string) {
-  const updatedMoromi = moromiData.map(m => 
-    m.by === by && m.jungoId === jungoId 
-      ? { ...m, kenteiTankId: kenteiTankId || null }
-      : m
-  );
+  const { error } = await supabase
+    .from('moromi_data')
+    .update({ kentei_tank_id: kenteiTankId || null, updated_at: new Date().toISOString() })
+    .eq('by', by)
+    .eq('jungo_id', jungoId);
   
-  await saveMoromiData(updatedMoromi, moromiProcesses);
+  if (error) {
+    console.error('検定タンク更新エラー:', error);
+    return;
+  }
+  
   await loadMoromiByBY(currentBY);
 }
 

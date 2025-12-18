@@ -272,14 +272,13 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
       <main className="container mx-auto px-4 md:px-6 py-4 md:py-8">
         {currentPage === 'dashboard' && (
   <Dashboard 
-    moromiData={dataContext.moromiData}
-    moromiProcesses={dataContext.moromiProcesses}
-    getProcessesByMoromi={dataContext.getProcessesByMoromi}
-    saveMoromiData={dataContext.saveMoromiData}
-    loadMoromiByBY={dataContext.loadMoromiByBY}
-    currentBY={dataContext.currentBY}
-    dataContext={dataContext}  // ← 追加
-  />
+  moromiData={dataContext.moromiData}
+  moromiProcesses={dataContext.moromiProcesses}
+  getProcessesByMoromi={dataContext.getProcessesByMoromi}
+  loadMoromiByBY={dataContext.loadMoromiByBY}
+  currentBY={dataContext.currentBY}
+  dataContext={dataContext}
+/>
 )}
           
         {currentPage === 'shift' && (
