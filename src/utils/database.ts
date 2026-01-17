@@ -701,13 +701,14 @@ export const getWeeklyDutyActions = async (): Promise<WeeklyDutyAction[]> => {
   if (error) throw error;
 
   return data.map(row => ({
-    id: row.id,
-    staffId: row.staff_id,
-    date: row.date,
-    action: row.action,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  id: row.id,
+  staffId: row.staff_id,
+  date: row.date,
+  category: row.category || 'other',
+  action: row.action,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+}));
 };
 
 // 特定スタッフのアクション記録を取得
@@ -721,13 +722,14 @@ export const getWeeklyDutyActionsByStaff = async (staffId: string): Promise<Week
   if (error) throw error;
 
   return data.map(row => ({
-    id: row.id,
-    staffId: row.staff_id,
-    date: row.date,
-    action: row.action,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  id: row.id,
+  staffId: row.staff_id,
+  date: row.date,
+  category: row.category || 'other',
+  action: row.action,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+}));
 };
 
 // 週番アクション記録を保存
@@ -749,24 +751,26 @@ export const saveWeeklyDutyAction = async (
   if (existing) {
     // 更新
     const { error } = await supabase
-      .from('weekly_duty_actions')
-      .update({
-        action: action.action,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.id);
+  .from('weekly_duty_actions')
+  .update({
+    category: action.category,
+    action: action.action,
+    updated_at: new Date().toISOString(),
+  })
+  .eq('id', existing.id);
 
     if (error) throw error;
   } else {
     // 新規追加
     const { error } = await supabase
-      .from('weekly_duty_actions')
-      .insert({
-        staff_id: action.staffId,
-        date: action.date,
-        action: action.action,
-        updated_at: new Date().toISOString(),
-      });
+  .from('weekly_duty_actions')
+  .insert({
+    staff_id: action.staffId,
+    date: action.date,
+    category: action.category,
+    action: action.action,
+    updated_at: new Date().toISOString(),
+  });
 
     if (error) throw error;
   }

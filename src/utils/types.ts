@@ -164,15 +164,22 @@ export interface WeeklyDuty {
   updatedAt: string;
 }
 
-// 週番アクション記録
-export interface WeeklyDutyAction {
+// プラスワン記録のカテゴリ
+export type PlusOneCategory = 'cleaning' | 'maintenance' | 'improvement' | 'other';
+
+// プラスワン記録（旧: 週番アクション記録）
+export interface PlusOneAction {
   id: number;
   staffId: string;
   date: string; // YYYY-MM-DD形式
+  category: PlusOneCategory; // 記録の種類
   action: string; // 最大200文字
   createdAt: string;
   updatedAt: string;
 }
+
+// 後方互換性のためのエイリアス（既存コードが動くように）
+export type WeeklyDutyAction = PlusOneAction;
 
 // 上槽評価データ
 // 上槽評価データ

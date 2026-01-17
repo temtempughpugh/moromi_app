@@ -6,7 +6,7 @@ import DekojiPage from './components/DekojiPage';
 import TaskManagement from './components/TaskManagement';  // ← 追加
 import JosoHyokaComponent from './components/JosoHyoka';
 import JosoCommentAlert from './components/JosoCommentAlert';
-import WeeklyDutyActions from './components/WeeklyDutyActions';  // ← 追加
+import PlusOneRecord from './components/PlusOneRecord';
 import WorkTimer from './components/WorkTimer';
 import { useData } from './hooks/useData';
 
@@ -236,7 +236,7 @@ const [dekojiDate, setDekojiDate] = useState<string>('');
       : 'bg-blue-800 hover:bg-blue-700'
   }`}
 >
-  📝 週番記録
+  📝 プラスワン
 </button>
 <button
   onClick={() => {
@@ -335,12 +335,11 @@ weeklyDuties={dataContext.weeklyDuties}
 )}
 
 {currentPage === 'weekly-duty-actions' && (
-  <WeeklyDutyActions
+  <PlusOneRecord
     staffList={dataContext.staffList}
-    loadWeeklyDutyActionsByStaff={dataContext.loadWeeklyDutyActionsByStaff}
-    saveWeeklyDutyAction={dataContext.saveWeeklyDutyAction}
-    deleteWeeklyDutyAction={dataContext.deleteWeeklyDutyAction}
-    getCurrentDuty={dataContext.getCurrentDuty}
+    loadPlusOneActionsByStaff={dataContext.loadWeeklyDutyActionsByStaff}
+    savePlusOneAction={dataContext.saveWeeklyDutyAction}
+    deletePlusOneAction={dataContext.deleteWeeklyDutyAction}
   />
 )}
 

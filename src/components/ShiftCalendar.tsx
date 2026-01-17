@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { MoromiData, MoromiProcess, Staff, Shift, MonthlySettings, MemoRow, RiceDelivery, WeeklyDuty } from '../utils/types';
 
 
@@ -39,8 +39,6 @@ export default function ShiftCalendar({
   saveRiceDelivery,
   saveStaff,
   deleteStaff,
-  weeklyDuties,
-  saveWeeklyDuties,
 }: ShiftCalendarProps) {
   const [localShifts, setLocalShifts] = useState<Record<string, Shift>>({});
   const [localMemos, setLocalMemos] = useState<string[]>([]);
@@ -806,14 +804,6 @@ export default function ShiftCalendar({
         </table>
       </div>
 
-      <div className="no-print mt-6">
-        <WeeklyDutySection 
-          staffList={staffList} 
-          weeklyDuties={weeklyDuties}
-          saveWeeklyDuties={saveWeeklyDuties}
-        />
-      </div>
-
       <div className="no-print">
         <StaffManagementSection staffList={staffList} saveStaff={saveStaff} deleteStaff={deleteStaff} />
       </div>
@@ -1002,219 +992,6 @@ function StaffManagementSection({ staffList, saveStaff, deleteStaff }: StaffMana
             </div>
           ))}
       </div>
-    </div>
-  );
-}
-
-interface WeeklyDutySectionProps {
-  staffList: Staff[];
-  weeklyDuties: WeeklyDuty[];
-  saveWeeklyDuties: (duties: Omit<WeeklyDuty, 'id' | 'createdAt' | 'updatedAt'>[]) => Promise<void>;
-}
-
-function WeeklyDutySection({ staffList, weeklyDuties, saveWeeklyDuties }: WeeklyDutySectionProps) {
-  const [baseDate, setBaseDate] = useState<string>(() => {
-    if (weeklyDuties.length > 0) {
-      return weeklyDuties[0].baseDate;
-    }
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
-  
-  const [dutyOrder, setDutyOrder] = useState<{ staffId: string; order: number }[]>(() => {
-    if (weeklyDuties.length > 0) {
-      return weeklyDuties.map(d => ({ staffId: d.staffId, order: d.orderNumber }));
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    if (weeklyDuties.length > 0) {
-      setBaseDate(weeklyDuties[0].baseDate);
-      setDutyOrder(weeklyDuties.map(d => ({ staffId: d.staffId, order: d.orderNumber })));
-    }
-  }, [weeklyDuties]);
-
-  const activeStaff = staffList.filter(s => s.isActive);
-
-  const handleAddStaff = (staffId: string) => {
-    if (dutyOrder.some(d => d.staffId === staffId)) return;
-    const maxOrder = dutyOrder.length > 0 ? Math.max(...dutyOrder.map(d => d.order)) : 0;
-    setDutyOrder([...dutyOrder, { staffId, order: maxOrder + 1 }]);
-  };
-
-  const handleRemoveStaff = (staffId: string) => {
-    const newOrder = dutyOrder.filter(d => d.staffId !== staffId);
-    const reorderedOrder = newOrder.map((d, index) => ({ ...d, order: index + 1 }));
-    setDutyOrder(reorderedOrder);
-  };
-
-  const handleMoveUp = (staffId: string) => {
-    const index = dutyOrder.findIndex(d => d.staffId === staffId);
-    if (index <= 0) return;
-    
-    const newOrder = [...dutyOrder];
-    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-    
-    newOrder.forEach((d, i) => d.order = i + 1);
-    setDutyOrder(newOrder);
-  };
-
-  const handleMoveDown = (staffId: string) => {
-    const index = dutyOrder.findIndex(d => d.staffId === staffId);
-    if (index < 0 || index >= dutyOrder.length - 1) return;
-    
-    const newOrder = [...dutyOrder];
-    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-    
-    newOrder.forEach((d, i) => d.order = i + 1);
-    setDutyOrder(newOrder);
-  };
-
-  const handleSave = async () => {
-    if (dutyOrder.length === 0) {
-      alert('最低1人の従業員を設定してください');
-      return;
-    }
-
-    if (!baseDate) {
-      alert('基準日を設定してください');
-      return;
-    }
-
-    try {
-      const duties = dutyOrder.map(d => ({
-        staffId: d.staffId,
-        orderNumber: d.order,
-        baseDate: baseDate,
-        isActive: true,
-      }));
-
-      await saveWeeklyDuties(duties);
-      alert('週番設定を保存しました');
-    } catch (error) {
-      console.error('保存エラー:', error);
-      alert('保存に失敗しました');
-    }
-  };
-
-  const getStaffName = (staffId: string) => {
-    return staffList.find(s => s.id === staffId)?.name || '不明';
-  };
-
-  const getCurrentDutyPreview = () => {
-    if (dutyOrder.length === 0 || !baseDate) return null;
-    
-    const base = new Date(baseDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    base.setHours(0, 0, 0, 0);
-    
-    const diffTime = today.getTime() - base.getTime();
-    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-    const dutyIndex = diffWeeks % dutyOrder.length;
-    
-    return dutyOrder[dutyIndex >= 0 ? dutyIndex : dutyIndex + dutyOrder.length];
-  };
-
-  const currentDuty = getCurrentDutyPreview();
-
-  return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-xl font-bold mb-6">週番の設定</h3>
-
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">基準日</label>
-        <input
-          type="date"
-          value={baseDate}
-          onChange={(e) => setBaseDate(e.target.value)}
-          className="px-4 py-2 border rounded"
-        />
-        <p className="text-sm text-gray-600 mt-1">
-          この日から1週間ごとに当番が切り替わります
-        </p>
-      </div>
-
-      <div className="mb-6">
-        <h4 className="text-lg font-semibold mb-3">当番の順番</h4>
-        
-        {dutyOrder.length === 0 ? (
-          <p className="text-gray-500 mb-4">まだ従業員が追加されていません</p>
-        ) : (
-          <div className="space-y-2 mb-4">
-            {dutyOrder.map((duty, index) => (
-              <div key={duty.staffId} className="flex items-center gap-4 p-3 border rounded bg-gray-50">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleMoveUp(duty.staffId)}
-                    disabled={index === 0}
-                    className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => handleMoveDown(duty.staffId)}
-                    disabled={index === dutyOrder.length - 1}
-                    className="px-2 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ↓
-                  </button>
-                </div>
-                <div className="flex-1">
-                  <span className="font-semibold">順番{duty.order}:</span> {getStaffName(duty.staffId)}
-                </div>
-                <button
-                  onClick={() => handleRemoveStaff(duty.staffId)}
-                  className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                >
-                  削除
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium mb-2">従業員を追加</label>
-          <select
-            onChange={(e) => {
-              if (e.target.value) {
-                handleAddStaff(e.target.value);
-                e.target.value = '';
-              }
-            }}
-            className="w-full px-4 py-2 border rounded"
-            defaultValue=""
-          >
-            <option value="">-- 選択してください --</option>
-            {activeStaff
-              .filter(s => !dutyOrder.some(d => d.staffId === s.id))
-              .map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-          </select>
-        </div>
-      </div>
-
-      {currentDuty && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
-          <h4 className="font-semibold mb-2">現在の当番（プレビュー）</h4>
-          <p className="text-lg">
-            <span className="font-bold">{getStaffName(currentDuty.staffId)}</span>
-          </p>
-          <p className="text-sm text-gray-600 mt-1">
-            基準日: {baseDate} から計算
-          </p>
-        </div>
-      )}
-
-      <button
-        onClick={handleSave}
-        className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
-      >
-        週番設定を保存
-      </button>
     </div>
   );
 }

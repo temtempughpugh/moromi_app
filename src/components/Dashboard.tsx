@@ -31,7 +31,6 @@ export default function Dashboard({ moromiData, moromiProcesses, loadMoromiByBY,
   const [showCalendar, setShowCalendar] = useState(false);
   const [expandedJungo, setExpandedJungo] = useState<string | null>(null);
   const [processes, setProcesses] = useState<{ [key: string]: MoromiProcess[] }>({});
-  const getCurrentDuty = dataContext?.getCurrentDuty || (() => null);
 
   const formatDate = (date: Date): string => {
     const days = ['日', '月', '火', '水', '木', '金', '土'];
@@ -636,29 +635,24 @@ async function handleKenteiTankChange(by: number, jungoId: string, kenteiTankId:
   )}
 </div>
            {/* 週番表示（クリック可能） */}
-{(() => {
-  const currentDutyStaff = getCurrentDuty(currentDate);
-  return currentDutyStaff ? (
-    <div className="flex gap-2">
-      <button
-        onClick={() => {
-          window.dispatchEvent(new CustomEvent('navigateToWeeklyDuty'));
-        }}
-        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
-      >
-        <span className="text-sm font-semibold">週番: {currentDutyStaff.name}</span>
-      </button>
-      <button
-        onClick={() => {
-          window.dispatchEvent(new CustomEvent('navigateToWorkTimer'));
-        }}
-        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
-      >
-        <span className="text-sm font-semibold">⏱️ タイム</span>
-      </button>
-    </div>
-  ) : null;
-})()}
+<div className="flex gap-2">
+  <button
+    onClick={() => {
+      window.dispatchEvent(new CustomEvent('navigateToWeeklyDuty'));
+    }}
+    className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+  >
+    <span className="text-sm font-semibold">プラスワン🙋‍♂️</span>
+  </button>
+  <button
+    onClick={() => {
+      window.dispatchEvent(new CustomEvent('navigateToWorkTimer'));
+    }}
+    className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+  >
+    <span className="text-sm font-semibold">⏱️ タイム</span>
+  </button>
+</div>
           
           <button 
             onClick={() => changeDate(1)}
