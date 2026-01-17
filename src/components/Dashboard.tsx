@@ -1277,7 +1277,7 @@ return (
       const isExpanded = expandedJungo === moromi.jungoId;
       return (
         <div key={moromi.jungoId} className="bg-white border-2 border-slate-200 rounded-lg shadow-sm">
-          <div className="p-4 cursor-pointer active:bg-slate-50" onClick={() => setExpandedJungo(isExpanded ? null : moromi.jungoId)}>
+          <div className="p-4 cursor-pointer active:bg-slate-50" onClick={() => handleRowClick(moromi.jungoId)}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-lg font-bold text-blue-600">{moromi.jungoId}号</span>
               <span className={`px-2 py-1 rounded text-xs font-semibold ${statusInfo.color}`}>{statusInfo.status}</span>
