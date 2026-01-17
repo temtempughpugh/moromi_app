@@ -1107,8 +1107,8 @@ return (
         <div className="bg-slate-800 px-4 py-3">
           <h2 className="text-xl font-bold text-white">📋 もろみ一覧</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+<div className="hidden md:block overflow-x-auto">
+  <table className="w-full">
             <thead className="bg-slate-100 border-b-2 border-slate-300">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-bold">順号</th>
@@ -1292,20 +1292,34 @@ return (
             <div className="text-right mt-2"><span className="text-blue-600 text-sm font-semibold">{isExpanded ? '▲ 閉じる' : '▼ 詳細'}</span></div>
           </div>
           {isExpanded && (
-            <div className="border-t border-slate-200 p-4 bg-slate-50 space-y-3">
-              <div className="text-xs space-y-1">
-                <div><span className="text-gray-600">添タンク:</span> <span className="font-semibold">{moromi.soeTankId || '-'}</span></div>
-                <div><span className="text-gray-600">タンク:</span> <span className="font-semibold">{moromi.tankNo || '-'}</span></div>
-                <div><span className="text-gray-600">検定タンク:</span> <span className="font-semibold">{moromi.kenteiTankId || '-'}</span></div>
-                <div className="pt-2 border-t">
-                  <div>酒母卸: {moromi.motoOroshiDate.substring(5)}</div>
-                  <div>添仕込: {moromi.soeShikomiDate.substring(5)}</div>
-                  <div>仲仕込: {moromi.nakaShikomiDate.substring(5)}</div>
-                  <div>留仕込: {moromi.tomeShikomiDate.substring(5)}</div>
-                </div>
-              </div>
-            </div>
-          )}
+  <div className="border-t border-slate-200 p-4 bg-slate-50 space-y-3">
+    <div className="text-xs space-y-1">
+      <div><span className="text-gray-600">添タンク:</span> <span className="font-semibold">{moromi.soeTankId || '-'}</span></div>
+      <div><span className="text-gray-600">タンク:</span> <span className="font-semibold">{moromi.tankNo || '-'}</span></div>
+      <div><span className="text-gray-600">検定タンク:</span> <span className="font-semibold">{moromi.kenteiTankId || '-'}</span></div>
+      <div className="pt-2 border-t">
+        <div>酒母卸: {moromi.motoOroshiDate.substring(5)}</div>
+        <div>添仕込: {moromi.soeShikomiDate.substring(5)}</div>
+        <div>仲仕込: {moromi.nakaShikomiDate.substring(5)}</div>
+        <div>留仕込: {moromi.tomeShikomiDate.substring(5)}</div>
+      </div>
+    </div>
+    {/* 工程一覧を追加 */}
+    <div className="pt-2 border-t">
+      <h4 className="font-bold text-xs mb-2">工程一覧</h4>
+      <div className="space-y-1">
+        {processes[moromi.jungoId]?.map((process: MoromiProcess) => (
+          <div key={`${process.processType}-${process.riceType}-${process.senmaiDate}`} className="flex justify-between text-xs bg-white p-1 rounded">
+            <span className={`px-1 rounded ${getProcessColor(process.processType)}`}>{getProcessName(process.processType)}</span>
+            <span>{process.riceType}</span>
+            <span>{process.polishingRatio}%</span>
+            <span>{process.amount || '-'}kg</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
         </div>
       );
     })}
