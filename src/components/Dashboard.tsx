@@ -1293,6 +1293,7 @@ return (
           </div>
           {isExpanded && (
   <div className="border-t border-slate-200 p-4 bg-slate-50 space-y-3">
+    
     <div className="text-xs space-y-1">
       <div><span className="text-gray-600">添タンク:</span> <span className="font-semibold">{moromi.soeTankId || '-'}</span></div>
       <div><span className="text-gray-600">タンク:</span> <span className="font-semibold">{moromi.tankNo || '-'}</span></div>
