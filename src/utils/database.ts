@@ -173,6 +173,37 @@ export async function getProcessesByMoromi(by: number, jungoId: string): Promise
   }));
 }
 
+// ============================================
+// 特定BYの全工程データを一括取得（N+1問題解消用）
+// ============================================
+export async function getAllProcessesByBY(by: number): Promise<MoromiProcess[]> {
+  const { data, error } = await supabase
+    .from('moromi_process')
+    .select('*')
+    .eq('by', by);
+
+  if (error) throw error;
+
+  return (data || []).map(p => ({
+    by: p.by,
+    jungoId: p.jungo_id,
+    processType: p.process_type,
+    senmaiDate: p.senmai_date,
+    riceType: p.rice_type,
+    polishingRatio: p.polishing_ratio,
+    amount: p.amount,
+    hikomiDate: p.hikomi_date,
+    moriDate: p.mori_date,
+    dekojiDate: p.dekoji_date,
+    kakeShikomiDate: p.kake_shikomi_date,
+    shikomiDate: p.shikomi_date,
+    predictedDekojiRate: p.predicted_dekoji_rate,
+    lastSheetWeight: p.last_sheet_weight,
+    actualDekojiRate: p.actual_dekoji_rate,
+    storageType: p.storage_type,
+  }));
+}
+
 // 全データ取得
 export async function getAllData(): Promise<{ moromiData: MoromiData[], moromiProcesses: MoromiProcess[] }> {
   const { data: moromiData, error: moromiError } = await supabase

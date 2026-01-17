@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllData, isDatabaseEmpty,getWorkTimeRecords,
+import { saveMoromiData as saveToSupabase, getAvailableBYs, getMoromiByBY, getProcessesByMoromi, getAllProcessesByBY, getAllData, isDatabaseEmpty,getWorkTimeRecords,
   saveWorkTimeRecord as saveWorkTimeRecordToDatabase,
   deleteWorkTimeRecord as deleteWorkTimeRecordFromDatabase } from '../utils/database';
 import type { MoromiData, MoromiProcess, TaskManagement, OverdueTask, WeeklyDuty, WeeklyDutyAction, JosoHyoka,WorkTimeRecord,
@@ -120,17 +120,17 @@ useEffect(() => {
   try {
     console.log('===== loadMoromiByBY 開始 =====');
     console.log('取得するBY:', by);
-    const data = await getMoromiByBY(by);
-    console.log('取得したデータ数:', data.length);
-    setMoromiData(data);
     
-    // 全もろみの工程データを取得
-    const allProcesses: MoromiProcess[] = [];
-    for (const moromi of data) {
-      const processes = await getProcessesByMoromi(by, moromi.jungoId);
-      allProcesses.push(...processes);
-    }
+    // 2つのクエリを並列実行（N+1問題解消）
+    const [data, allProcesses] = await Promise.all([
+      getMoromiByBY(by),
+      getAllProcessesByBY(by)
+    ]);
+    
+    console.log('取得したデータ数:', data.length);
     console.log('取得した工程データ数:', allProcesses.length);
+    
+    setMoromiData(data);
     setMoromiProcesses(allProcesses);
     
     console.log('===== loadMoromiByBY 終了 =====');
