@@ -26,10 +26,19 @@ export default function JosoHyokaComponent({
   );
 
   // 順号でソート済みのもろみデータ
-  const sortedMoromi = useMemo(() => 
-    [...moromiData].sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId)),
+ const sortedMoromi = useMemo(() => 
+    [...moromiData].sort((a, b) => {
+      const aNum = parseInt(a.jungoId);
+      const bNum = parseInt(b.jungoId);
+      const aIsNum = !isNaN(aNum);
+      const bIsNum = !isNaN(bNum);
+      if (aIsNum && bIsNum) return aNum - bNum;
+      if (aIsNum) return -1;
+      if (bIsNum) return 1;
+      return a.jungoId.localeCompare(b.jungoId);
+    }),
     [moromiData]
-  );
+);
 
   // 上槽評価データを取得
   const getHyoka = (jungoId: string): JosoHyoka => {
