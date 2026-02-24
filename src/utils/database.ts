@@ -115,7 +115,8 @@ export async function getMoromiByBY(by: number): Promise<MoromiData[]> {
   const { data, error } = await supabase
     .from('moromi_data')
     .select('*')
-    .eq('by', by);
+    .eq('by', by)
+    .limit(1000);
 
   if (error) throw error;
 
@@ -180,7 +181,8 @@ export async function getAllProcessesByBY(by: number): Promise<MoromiProcess[]> 
   const { data, error } = await supabase
     .from('moromi_process')
     .select('*')
-    .eq('by', by);
+    .eq('by', by)
+    .limit(10000);
 
   if (error) throw error;
 
@@ -208,13 +210,15 @@ export async function getAllProcessesByBY(by: number): Promise<MoromiProcess[]> 
 export async function getAllData(): Promise<{ moromiData: MoromiData[], moromiProcesses: MoromiProcess[] }> {
   const { data: moromiData, error: moromiError } = await supabase
     .from('moromi_data')
-    .select('*');
+    .select('*')
+    .limit(1000);
 
   if (moromiError) throw moromiError;
 
-  const { data: processData, error: processError } = await supabase
+const { data: processData, error: processError } = await supabase
     .from('moromi_process')
-    .select('*');
+    .select('*')
+    .limit(10000);
 
   if (processError) throw processError;
 
