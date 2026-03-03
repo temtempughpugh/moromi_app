@@ -45,29 +45,35 @@ export async function saveMoromiData(moromiDataList: MoromiData[], processList: 
   }
   
   // 新しいデータをINSERT
-  const { error: processError } = await supabase
-    .from('moromi_process')
-    .insert(processList.map(p => ({
-      by: p.by,
-      jungo_id: p.jungoId,
-      process_type: p.processType,
-      senmai_date: p.senmaiDate,
-      rice_type: p.riceType,
-      polishing_ratio: p.polishingRatio,
-      amount: p.amount,
-      hikomi_date: p.hikomiDate,
-      mori_date: p.moriDate,
-      dekoji_date: p.dekojiDate,
-      kake_shikomi_date: p.kakeShikomiDate,
-      shikomi_date: p.shikomiDate,
-      predicted_dekoji_rate: p.predictedDekojiRate,
-      last_sheet_weight: p.lastSheetWeight,
-      actual_dekoji_rate: p.actualDekojiRate,
-      storage_type: p.storageType,
-      updated_at: new Date().toISOString()
-    })));
+  // 新しいデータをINSERT（チャンク分割）
+  const processRows = processList.map(p => ({
+    by: p.by,
+    jungo_id: p.jungoId,
+    process_type: p.processType,
+    senmai_date: p.senmaiDate,
+    rice_type: p.riceType,
+    polishing_ratio: p.polishingRatio,
+    amount: p.amount,
+    hikomi_date: p.hikomiDate,
+    mori_date: p.moriDate,
+    dekoji_date: p.dekojiDate,
+    kake_shikomi_date: p.kakeShikomiDate,
+    shikomi_date: p.shikomiDate,
+    predicted_dekoji_rate: p.predictedDekojiRate,
+    last_sheet_weight: p.lastSheetWeight,
+    actual_dekoji_rate: p.actualDekojiRate,
+    storage_type: p.storageType,
+    updated_at: new Date().toISOString()
+  }));
 
-  if (processError) throw processError;
+  const CHUNK_SIZE = 200;
+  for (let i = 0; i < processRows.length; i += CHUNK_SIZE) {
+    const chunk = processRows.slice(i, i + CHUNK_SIZE);
+    const { error: processError } = await supabase
+      .from('moromi_process')
+      .insert(chunk);
+    if (processError) throw processError;
+  }
 }
 
 export async function updateDekojiData(processes: MoromiProcess[]): Promise<void> {
