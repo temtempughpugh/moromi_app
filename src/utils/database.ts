@@ -184,15 +184,26 @@ export async function getProcessesByMoromi(by: number, jungoId: string): Promise
 // 特定BYの全工程データを一括取得（N+1問題解消用）
 // ============================================
 export async function getAllProcessesByBY(by: number): Promise<MoromiProcess[]> {
-  const { data, error } = await supabase
-    .from('moromi_process')
-    .select('*')
-    .eq('by', by)
-    .limit(10000);
+  const allData: any[] = [];
+  const PAGE_SIZE = 500;
+  let from = 0;
 
-  if (error) throw error;
+  while (true) {
+    const { data, error } = await supabase
+      .from('moromi_process')
+      .select('*')
+      .eq('by', by)
+      .range(from, from + PAGE_SIZE - 1);
 
-  return (data || []).map(p => ({
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allData.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return allData.map(p => ({
     by: p.by,
     jungoId: p.jungo_id,
     processType: p.process_type,
