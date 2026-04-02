@@ -99,7 +99,20 @@ export default function ShiftCalendar({
       
       const josoDate = new Date(m.josoDate);
       return (startDate <= monthEnd && josoDate >= monthStart);
-    }).sort((a, b) => parseInt(a.jungoId) - parseInt(b.jungoId));
+    }).sort((a, b) => {
+  const numA = parseInt(a.jungoId);
+  const numB = parseInt(b.jungoId);
+  const isNumA = !isNaN(numA);
+  const isNumB = !isNaN(numB);
+  
+  // 両方数値 → 数値順
+  if (isNumA && isNumB) return numA - numB;
+  // 数値を先、非数値を後
+  if (isNumA && !isNumB) return -1;
+  if (!isNumA && isNumB) return 1;
+  // 両方非数値 → 文字列順
+  return a.jungoId.localeCompare(b.jungoId);
+});
   };
 
   const relevantMoromi = getRelevantMoromi();
