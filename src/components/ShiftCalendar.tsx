@@ -330,14 +330,14 @@ export default function ShiftCalendar({
 
   const getKojiAmount = (date: string): number => {
     const processes = moromiProcesses.filter(p => 
-      p.hikomiDate && p.hikomiDate.includes(date.substring(5)) && p.processType.includes('Koji')
+      p.hikomiDate && p.hikomiDate.includes(date.substring(5)) && p.processType.includes('Koji') && !p.riceType?.includes('乾燥麹')
     );
     return processes.reduce((sum, p) => sum + (p.amount || 0), 0);
   };
 
   const getSteaming = (date: string): string => {
     const hasKoji = moromiProcesses.some(p => 
-      p.hikomiDate && p.hikomiDate.includes(date.substring(5)) && p.processType.includes('Koji')
+      p.hikomiDate && p.hikomiDate.includes(date.substring(5)) && p.processType.includes('Koji') && !p.riceType?.includes('乾燥麹')
     );
     if (hasKoji) return '麹';
     
@@ -350,12 +350,12 @@ export default function ShiftCalendar({
   };
 
   const getMori = (date: string): string => {
-    const hasMori = moromiProcesses.some(p => p.moriDate && p.moriDate.includes(date.substring(5)));
+    const hasMori = moromiProcesses.some(p => p.moriDate && p.moriDate.includes(date.substring(5)) && !p.riceType?.includes('乾燥麹'));
     return hasMori ? '盛' : '';
   };
 
   const getDekoji = (date: string): string => {
-    const hasDekoji = moromiProcesses.some(p => p.dekojiDate && p.dekojiDate.includes(date.substring(5)));
+    const hasDekoji = moromiProcesses.some(p => p.dekojiDate && p.dekojiDate.includes(date.substring(5)) && !p.riceType?.includes('乾燥麹'));
     return hasDekoji ? '出' : '';
   };
 
